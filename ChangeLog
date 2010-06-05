@@ -1,3 +1,7 @@
+2010-06-05  Herbert Xu <herbert@gondor.apana.org.au>
+
+	* Release 0.5.6.1.
+
 2010-05-29  Herbert Xu <herbert@gondor.apana.org.au>
 
 	* Continue after EINTR in read(1) with no pending signals.
