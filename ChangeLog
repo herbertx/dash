@@ -1,3 +1,7 @@
+2010-05-27  Herbert Xu <herbert@gondor.apana.org.au>
+
+	* Fix wait regression where it does not wait for all jobs.
+
 2010-05-27  Jilles Tjoelker <jilles@stack.nl>
 
 	* Fix corruption of redirections with byte 0x81.
