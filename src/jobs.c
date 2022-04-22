@@ -1526,8 +1526,15 @@ STATIC int
 getstatus(struct job *job) {
 	int status;
 	int retval;
+	struct procstat *ps;
 
-	status = job->ps[job->nprocs - 1].status;
+	ps = job->ps + job->nprocs - 1;
+	status = ps->status;
+	if (pipefail) {
+		while (status == 0 && --ps >= job->ps)
+			status = ps->status;
+	}
+
 	retval = WEXITSTATUS(status);
 	if (!WIFEXITED(status)) {
 #if JOBS

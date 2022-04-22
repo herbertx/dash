@@ -80,6 +80,7 @@ static const char *const optnames[NOPTS] = {
 	"notify",
 	"nounset",
 	"nolog",
+	"pipefail",
 	"debug",
 };
 
@@ -99,6 +100,7 @@ const char optletters[NOPTS] = {
 	'a',
 	'b',
 	'u',
+	0,
 	0,
 	0,
 };
