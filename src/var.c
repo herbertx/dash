@@ -107,7 +107,7 @@ STATIC struct var *vartab[VTABSIZE];
 
 STATIC struct var **hashvar(const char *);
 STATIC int vpcmp(const void *, const void *);
-STATIC struct var **findvar(struct var **, const char *);
+STATIC struct var **findvar(const char *);
 
 /*
  * Initialize the varable symbol tables and import the environment
@@ -251,9 +251,8 @@ struct var *setvareq(char *s, int flags)
 {
 	struct var *vp, **vpp;
 
-	vpp = hashvar(s);
 	flags |= (VEXPORT & (((unsigned) (1 - aflag)) - 1));
-	vpp = findvar(vpp, s);
+	vpp = findvar(s);
 	vp = *vpp;
 	if (vp) {
 		if (vp->flags & VREADONLY) {
@@ -315,7 +314,7 @@ lookupvar(const char *name)
 {
 	struct var *v;
 
-	if ((v = *findvar(hashvar(name), name)) && !(v->flags & VUNSET)) {
+	if ((v = *findvar(name)) && !(v->flags & VUNSET)) {
 #ifdef WITH_LINENO
 		if (v == &vlineno && v->text == linenovar) {
 			fmtstr(linenovar+7, sizeof(linenovar)-7, "%d", lineno);
@@ -422,7 +421,7 @@ exportcmd(int argc, char **argv)
 			if ((p = strchr(name, '=')) != NULL) {
 				p++;
 			} else {
-				if ((vp = *findvar(hashvar(name), name))) {
+				if ((vp = *findvar(name))) {
 					vp->flags |= flag;
 					continue;
 				}
@@ -466,7 +465,6 @@ localcmd(int argc, char **argv)
 void mklocal(char *name, int flags)
 {
 	struct localvar *lvp;
-	struct var **vpp;
 	struct var *vp;
 
 	INTOFF;
@@ -479,8 +477,7 @@ void mklocal(char *name, int flags)
 	} else {
 		char *eq;
 
-		vpp = hashvar(name);
-		vp = *findvar(vpp, name);
+		vp = *findvar(name);
 		eq = strchr(name, '=');
 		if (vp == NULL) {
 			if (eq)
@@ -667,9 +664,11 @@ vpcmp(const void *a, const void *b)
 }
 
 STATIC struct var **
-findvar(struct var **vpp, const char *name)
+findvar(const char *name)
 {
-	for (; *vpp; vpp = &(*vpp)->next) {
+	struct var **vpp;
+
+	for (vpp = hashvar(name); *vpp; vpp = &(*vpp)->next) {
 		if (varequal((*vpp)->text, name)) {
 			break;
 		}
