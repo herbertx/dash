@@ -615,7 +615,7 @@ void fixredir(union node *n, const char *text, int err)
 	else {
 
 		if (err)
-			synerror("Bad fd number");
+			sh_error("Bad fd number: %s", text);
 		else
 			n->ndup.vname = makename();
 	}
