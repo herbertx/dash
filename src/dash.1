@@ -1441,7 +1441,8 @@ cmd \-a \-c arg file file
 cmd \-carg -a file file
 cmd \-a \-carg \-\- file file
 .Ed
-.It hash Fl rv Ar command ...
+.It hash Op Ar command ...
+.It hash Fl r
 The shell maintains a hash table which remembers the
 locations of commands.
 With no arguments whatsoever,
@@ -1457,9 +1458,6 @@ With arguments, the
 .Ic hash
 command removes the specified commands from the hash table (unless
 they are functions) and then locates them.
-With the
-.Fl v
-option, hash prints the locations of the commands as it finds them.
 The
 .Fl r
 option causes the hash command to delete all the entries in the hash table

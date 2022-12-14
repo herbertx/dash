@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #ifdef HAVE_PATHS_H
 #include <paths.h>
@@ -271,11 +272,16 @@ hashcmd(int argc, char **argv)
 	int c;
 	struct cmdentry entry;
 	char *name;
+	bool clear;
 
-	while ((c = nextopt("r")) != '\0') {
+	clear = false;
+	while ((c = nextopt("r")) != '\0')
+		clear = true;
+	if(clear) {
 		clearcmdentry();
 		return 0;
 	}
+
 	if (*argptr == NULL) {
 		for (pp = cmdtable ; pp < &cmdtable[CMDTABLESIZE] ; pp++) {
 			for (cmdp = *pp ; cmdp ; cmdp = cmdp->next) {
