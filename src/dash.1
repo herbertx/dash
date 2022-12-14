@@ -1342,13 +1342,12 @@ The number of previous commands that are accessible.
 .El
 .It fg Op Ar job
 Move the specified job or the current job to the foreground.
-.It getopts Ar optstring var
+.It getopts Ar optstring var Op Ar arg ...
 The
 .Tn POSIX
 .Ic getopts
 command, not to be confused with the
-.Em Bell Labs
--derived
+.Em Bell Labs Ns -derived
 .Xr getopt 1 .
 .Pp
 The first argument should be a series of letters, each of which may be
@@ -1385,6 +1384,12 @@ If an option is not allowed for in the
 then
 .Ev OPTARG
 will be unset.
+.Pp
+By default, the variables
+.Va $1 , ... , $n
+are inspected; if
+.Ar arg Ns s
+are specified, they'll be parsed instead.
 .Pp
 .Va optstring
 is a string of recognized option letters (see
@@ -1430,7 +1435,7 @@ do
 	\\?)	echo $USAGE; exit 1;;
 	esac
 done
-shift `expr $OPTIND - 1`
+shift $((OPTIND - 1))
 .Ed
 .Pp
 This code will accept any of the following as equivalent:

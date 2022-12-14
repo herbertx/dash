@@ -410,7 +410,7 @@ getoptscmd(int argc, char **argv)
 	char **optbase;
 
 	if (argc < 3)
-		sh_error("Usage: getopts optstring var [arg]");
+		sh_error("Usage: getopts optstring var [arg...]");
 	else if (argc == 3) {
 		optbase = shellparam.p;
 		if ((unsigned)shellparam.optind > shellparam.nparam + 1) {
