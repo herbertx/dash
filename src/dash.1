@@ -1467,6 +1467,20 @@ The
 .Fl r
 option causes the hash command to delete all the entries in the hash table
 except for functions.
+.It jobs Oo Fl lp Oc Op Ar job ...
+Display the status of all, or just the specified,
+.Ar job Ns s :
+.Bl -tag -compact -offset 5n -width "By default"
+.It By default
+display the job number, currency
+.Pq Sy +-
+status, if any, the job state, and its shell command.
+.It Fl l
+also output the PID of the group leader, and just the PID and shell commands
+of other members of the job.
+.It Fl p
+Display only leader PIDs, one per line.
+.El
 .It pwd Op Fl LP
 builtin command remembers what the current directory
 is rather than recomputing it each time.
