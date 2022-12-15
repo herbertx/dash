@@ -1481,6 +1481,33 @@ of other members of the job.
 .It Fl p
 Display only leader PIDs, one per line.
 .El
+.It kill Oo Fl s Ar sigspec | Fl Ns Ar signum | Fl Ns Ar sigspec Oc Op Ar pid | job ...
+Equivalent to
+.Xr kill 1 ,
+but a
+.Ar job
+spec may also be specified.
+Signals can be either case-insensitive names without
+.Dv SIG
+prefixes or decimal numbers; the default is
+.Dv TERM .
+.It kill Fl l Op Ar signum | exitstatus
+List available signal names without the
+.Dv SIG
+prefix
+.Pq Ar sigspec Ns s .
+If
+.Ar signum
+specified, display just the
+.Ar sigspec
+for that signal.
+If
+.Ar exitstatus
+specified
+.Pq > Sy 128 ,
+display just the
+.Ar sigspec
+that caused it.
 .It pwd Op Fl LP
 builtin command remembers what the current directory
 is rather than recomputing it each time.
