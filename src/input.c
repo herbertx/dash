@@ -54,9 +54,7 @@
 #include "alias.h"
 #include "parser.h"
 #include "main.h"
-#ifndef SMALL
 #include "myhistedit.h"
-#endif
 
 #define IBUFSIZ (BUFSIZ + 1)
 
@@ -256,12 +254,10 @@ retry:
 
 static int preadbuffer(void)
 {
-	char *q;
-	int more;
-#ifndef SMALL
 	int something;
-#endif
 	char savec;
+	int more;
+	char *q;
 
 	if (unlikely(parsefile->strpush)) {
 		popstring();
@@ -271,11 +267,11 @@ static int preadbuffer(void)
 		return PEOF;
 	flushall();
 
-	more = parsefile->lleft;
+	more = input_get_lleft(parsefile);
 	if (more <= 0) {
 again:
 		if ((more = preadfd()) <= 0) {
-			parsefile->lleft = parsefile->nleft = 0;
+			input_set_lleft(parsefile, parsefile->nleft = 0);
 			return PEOF;
 		}
 	}
@@ -283,37 +279,38 @@ again:
 	q = parsefile->nextc;
 
 	/* delete nul characters */
-#ifndef SMALL
 	something = 0;
-#endif
 	for (;;) {
 		int c;
 
 		more--;
 		c = *q;
 
-		if (!c)
+		if (!c) {
 			memmove(q, q + 1, more);
-		else {
-			q++;
-
-			if (c == '\n') {
-				parsefile->nleft = q - parsefile->nextc - 1;
-				break;
-			}
-
-#ifndef SMALL
-			switch (c) {
-			default:
-				something = 1;
-				/* fall through */
-			case '\t':
-			case ' ':
-				break;
-			}
-#endif
+			goto check;
 		}
 
+		q++;
+
+		if (IS_DEFINED_SMALL)
+			goto check;
+
+		switch (c) {
+		case '\n':
+			parsefile->nleft = q - parsefile->nextc - 1;
+			goto check;
+
+		default:
+			something = 1;
+			/* fall through */
+
+		case '\t':
+		case ' ':
+			break;
+		}
+
+check:
 		if (more <= 0) {
 			parsefile->nleft = q - parsefile->nextc - 1;
 			if (parsefile->nleft < 0)
@@ -321,12 +318,12 @@ again:
 			break;
 		}
 	}
-	parsefile->lleft = more;
+	input_set_lleft(parsefile, more);
 
-	savec = *q;
+	if (!IS_DEFINED_SMALL)
+		savec = *q;
 	*q = '\0';
 
-#ifndef SMALL
 	if (parsefile->fd == 0 && hist && something) {
 		HistEvent he;
 		INTOFF;
@@ -334,7 +331,6 @@ again:
 			parsefile->nextc);
 		INTON;
 	}
-#endif
 
 	if (vflag) {
 		out2str(parsefile->nextc);
@@ -343,7 +339,8 @@ again:
 #endif
 	}
 
-	*q = savec;
+	if (!IS_DEFINED_SMALL)
+		*q = savec;
 
 	return (signed char)*parsefile->nextc++;
 }
@@ -458,7 +455,7 @@ setinputfd(int fd, int push)
 	parsefile->fd = fd;
 	if (parsefile->buf == NULL)
 		parsefile->buf = ckmalloc(IBUFSIZ);
-	parsefile->lleft = parsefile->nleft = 0;
+	input_set_lleft(parsefile, parsefile->nleft = 0);
 	plinno = 1;
 }
 

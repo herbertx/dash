@@ -31,9 +31,27 @@
  *	@(#)myhistedit.h	8.2 (Berkeley) 5/4/95
  */
 
+#ifdef SMALL
+typedef void History;
+typedef void EditLine;
+typedef int HistEvent;
+
+enum {
+	H_APPEND,
+	H_ENTER,
+};
+
+#define hist NULL
+
+static inline void history(History *h, HistEvent *he, int action, char *p)
+{
+}
+#else
 #include <histedit.h>
 
 extern History *hist;
+#endif
+
 extern EditLine *el;
 extern int displayhist;
 

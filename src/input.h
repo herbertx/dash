@@ -76,7 +76,9 @@ struct parsefile {
 	int linno;		/* current line */
 	int fd;			/* file descriptor (or -1 if string) */
 	int nleft;		/* number of chars left in this line */
+#ifndef SMALL
 	int lleft;		/* number of chars left in this buffer */
+#endif
 	char *nextc;		/* next char in buffer */
 	char *buf;		/* input buffer */
 	struct strpush *strpush; /* for pushing strings at this level */
@@ -110,3 +112,19 @@ void setinputstring(char *);
 void popfile(void);
 void unwindfiles(struct parsefile *);
 void popallfiles(void);
+
+static inline int input_get_lleft(struct parsefile *pf)
+{
+#ifdef SMALL
+	return 0;
+#else
+	return pf->lleft;
+#endif
+}
+
+static inline void input_set_lleft(struct parsefile *pf, int len)
+{
+#ifndef SMALL
+	pf->lleft = len;
+#endif
+}
