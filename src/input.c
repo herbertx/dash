@@ -162,6 +162,17 @@ int pgetc(void)
 	return __pgetc();
 }
 
+static int stdin_clear_nonblock(void)
+{
+	int flags = fcntl(0, F_GETFL, 0);
+
+	if (flags >= 0) {
+		flags &=~ O_NONBLOCK;
+		flags = fcntl(0, F_SETFL, flags);
+	}
+
+	return flags;
+}
 
 static int
 preadfd(void)
@@ -198,22 +209,38 @@ retry:
 
 	} else
 #endif
+	if (parsefile->fd)
 		nr = read(parsefile->fd, buf, IBUFSIZ - 1);
+	else {
+		unsigned len = IBUFSIZ - 1;
 
+		nr = 0;
+
+		do {
+			int err;
+
+			err = read(0, buf, 1);
+			if (err <= 0) {
+				if (nr)
+					break;
+
+				nr = err;
+				if (errno != EWOULDBLOCK)
+					break;
+				if (stdin_clear_nonblock() < 0)
+					break;
+
+				out2str("sh: turning off NDELAY mode\n");
+				goto retry;
+			}
+
+			nr++;
+		} while (!IS_DEFINED_SMALL && *buf++ != '\n' && --len);
+	}
 
 	if (nr < 0) {
 		if (errno == EINTR)
 			goto retry;
-		if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
-			int flags = fcntl(0, F_GETFL, 0);
-			if (flags >= 0 && flags & O_NONBLOCK) {
-				flags &=~ O_NONBLOCK;
-				if (fcntl(0, F_SETFL, flags) >= 0) {
-					out2str("sh: turning off NDELAY mode\n");
-					goto retry;
-				}
-			}
-		}
 	}
 	return nr;
 }

@@ -34,6 +34,12 @@
  *	@(#)input.h	8.2 (Berkeley) 5/4/95
  */
 
+#ifdef SMALL
+#define IS_DEFINED_SMALL 1
+#else
+#define IS_DEFINED_SMALL 0
+#endif
+
 /* PEOF (the end of file marker) is defined in syntax.h */
 
 enum {
