@@ -77,6 +77,7 @@ INCLUDE <stdio.h>
 INCLUDE <unistd.h>
 INCLUDE "input.h"
 INCLUDE "error.h"
+INCLUDE "syntax.h"
 
 INIT {
 	basepf.nextc = basepf.buf = basebuf;
@@ -85,9 +86,11 @@ INIT {
 
 RESET {
 	/* clear input buffer */
-	basepf.lleft = basepf.nleft = 0;
-	basepf.unget = 0;
 	popallfiles();
+	basepf.unget = 0;
+	while (basepf.lastc[0] != '\n' &&
+	       basepf.lastc[0] != PEOF)
+		pgetc();
 }
 
 FORKRESET {
