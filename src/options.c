@@ -409,6 +409,9 @@ getoptscmd(int argc, char **argv)
 {
 	char **optbase;
 
+	nextopt(nullstr);
+	argc -= argptr - argv - 1;
+	argv = argptr - 1;
 	if (argc < 3)
 		sh_error("Usage: getopts optstring var [arg...]");
 	else if (argc == 3) {
