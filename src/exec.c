@@ -766,11 +766,11 @@ unsetfunc(const char *name)
 int
 typecmd(int argc, char **argv)
 {
-	int i;
 	int err = 0;
 
-	for (i = 1; i < argc; i++) {
-		err |= describe_command(out1, argv[i], NULL, 1);
+	nextopt(nullstr);
+	while (*argptr) {
+		err |= describe_command(out1, *argptr++, NULL, 1);
 	}
 	return err;
 }
