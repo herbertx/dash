@@ -87,7 +87,8 @@ RESET {
 	popallfiles();
 	basepf.unget = 0;
 	while (basepf.lastc[0] != '\n' &&
-	       basepf.lastc[0] != PEOF)
+	       basepf.lastc[0] != PEOF &&
+	       !int_pending())
 		pgetc();
 }
 
