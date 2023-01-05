@@ -1360,12 +1360,9 @@ parsebackq: {
 	struct heredoc *saveheredoclist;
 	int uninitialized_var(saveprompt);
 
-	str = NULL;
+	str = stackblock();
 	savelen = out - (char *)stackblock();
-	if (savelen > 0) {
-		str = alloca(savelen);
-		memcpy(str, stackblock(), savelen);
-	}
+	grabstackblock(savelen);
         if (oldstyle) {
                 /* We must read until the closing backquote, giving special
                    treatment to some slashes, and then push the string and
@@ -1445,12 +1442,8 @@ done:
 	/* Ignore any pushed back tokens left from the backquote parsing. */
 	if (oldstyle)
 		tokpushback = 0;
-	out = growstackto(savelen + 1);
-	if (str) {
-		memcpy(out, str, savelen);
-		STADJUST(savelen, out);
-	}
-	USTPUTC(CTLBACKQ, out);
+	out = stnputs(str, savelen, stackblock());
+	STPUTC(CTLBACKQ, out);
 	if (oldstyle)
 		goto parsebackq_oldreturn;
 	else
