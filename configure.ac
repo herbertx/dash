@@ -177,6 +177,17 @@ if test "$have_st_mtim" = "yes"; then
 		[Define if your `struct stat' has `st_mtim'])
 fi
 
+dnl F_DUPFD_CLOEXEC is a mandatory part of POSIX since Issue 7
+AC_MSG_CHECKING(for F_DUPFD_CLOEXEC)
+AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <unistd.h>
+#include <fcntl.h>],
+[return fcntl(0, F_DUPFD_CLOEXEC, 0)])],
+have_dupfd_cloexec=1, have_dupfd_cloexec=0)
+AC_MSG_RESULT($(expr yes \& $have_dupfd_cloexec \| no))
+AC_DEFINE_UNQUOTED([HAVE_F_DUPFD_CLOEXEC], [$have_dupfd_cloexec],
+	[Define to 1 your system supports F_DUPFD_CLOEXEC])
+
 AC_ARG_WITH(libedit, AS_HELP_STRING(--with-libedit, [Compile with libedit support]))
 use_libedit=
 if test "$with_libedit" = "yes"; then
