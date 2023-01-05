@@ -255,6 +255,7 @@ retry:
 
 static int preadbuffer(void)
 {
+	int first = whichprompt == 1;
 	int something;
 	char savec;
 	int more;
@@ -280,7 +281,7 @@ again:
 	q = parsefile->nextc;
 
 	/* delete nul characters */
-	something = 0;
+	something = !first;
 	for (;;) {
 		int c;
 
@@ -328,7 +329,7 @@ check:
 	if (parsefile->fd == 0 && hist && something) {
 		HistEvent he;
 		INTOFF;
-		history(hist, &he, whichprompt == 1? H_ENTER : H_APPEND,
+		history(hist, &he, first ? H_ENTER : H_APPEND,
 			parsefile->nextc);
 		INTON;
 	}
