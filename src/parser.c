@@ -1360,6 +1360,7 @@ parsebackq: {
 	struct heredoc *saveheredoclist;
 	int uninitialized_var(saveprompt);
 
+	USTPUTC(CTLBACKQ, out);
 	str = stackblock();
 	savelen = out - (char *)stackblock();
 	grabstackblock(savelen);
@@ -1443,7 +1444,6 @@ done:
 	if (oldstyle)
 		tokpushback = 0;
 	out = stnputs(str, savelen, stackblock());
-	STPUTC(CTLBACKQ, out);
 	if (oldstyle)
 		goto parsebackq_oldreturn;
 	else
