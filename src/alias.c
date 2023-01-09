@@ -197,7 +197,8 @@ freealias(struct alias *ap) {
 
 void
 printalias(const struct alias *ap) {
-	out1fmt("%s=%s\n", single_quote(ap->name), single_quote(ap->val));
+	out1str(single_quote(ap->name));
+	out1fmt("=%s\n", single_quote(ap->val));
 }
 
 STATIC struct alias **
