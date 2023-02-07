@@ -382,12 +382,10 @@ histcmd(int argc, char **argv)
 
 				evalstring(s, 0);
 				if (displayhist && hist) {
-					/*
-					 *  XXX what about recursive and
-					 *  relative histnums.
-					 */
 					history(hist, &he, H_ENTER, s);
 				}
+
+				break;
 			} else
 				fputs(s, efp);
 		}
