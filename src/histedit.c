@@ -212,9 +212,6 @@ histcmd(int argc, char **argv)
 	if (hist == NULL)
 		sh_error("history not active");
 
-	if (argc == 1)
-		sh_error("missing history argument");
-
 #ifdef __GLIBC__
 	optind = 0;
 #else
