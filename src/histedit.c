@@ -220,7 +220,7 @@ histcmd(int argc, char **argv)
 #else
 	optreset = 1; optind = 1; /* initialize getopt */
 #endif
-	while (not_fcnumber(argv[optind]) &&
+	while (not_fcnumber(argv[optind ?: 1]) &&
 	      (ch = getopt(argc, argv, ":e:lnrs")) != -1)
 		switch ((char)ch) {
 		case 'e':
@@ -246,6 +246,7 @@ histcmd(int argc, char **argv)
 			sh_error("unknown option: -%c", optopt);
 			/* NOTREACHED */
 		}
+	optind = optind ?: 1;
 	argc -= optind, argv += optind;
 
 	/*
