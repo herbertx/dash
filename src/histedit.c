@@ -296,6 +296,13 @@ histcmd(int argc, char **argv)
 		*repl++ = '\0';
 		argc--, argv++;
 	}
+
+	/*
+	 * If -s is specified, accept only one operand
+	 */
+	if (sflg && argc >= 2)
+		sh_error("too many args");
+
 	/*
 	 * determine [first] and [last]
 	 */
