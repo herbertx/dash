@@ -288,20 +288,17 @@ histcmd(int argc, char **argv)
 	}
 
 	/*
-	 * If executing, parse [old=new] now
+	 * If -s is specified, accept [old=new] first only
 	 */
-	if (lflg == 0 && argc > 0 &&
-	     ((repl = strchr(argv[0], '=')) != NULL)) {
-		pat = argv[0];
-		*repl++ = '\0';
-		argc--, argv++;
+	if (sflg) {
+		if (argc > 0 && ((repl = strchr(argv[0], '=')) != NULL)) {
+			pat = argv[0];
+			*repl++ = '\0';
+			argc--, argv++;
+		}
+		if (argc >= 2)
+			sh_error("too many args");
 	}
-
-	/*
-	 * If -s is specified, accept only one operand
-	 */
-	if (sflg && argc >= 2)
-		sh_error("too many args");
 
 	/*
 	 * determine [first] and [last]
