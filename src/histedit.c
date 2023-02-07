@@ -479,6 +479,8 @@ str_to_event(const char *str, int last)
 				 */
 				retval = history(hist, &he,
 						last ? H_FIRST : H_LAST);
+				if (retval != -1 && last)
+					retval = history(hist, &he, H_NEXT);
 			}
 		}
 		if (retval == -1)
