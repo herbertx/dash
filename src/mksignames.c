@@ -360,9 +360,7 @@ initialize_signames ()
       }
 }
 
-void
-write_signames (stream)
-     FILE *stream;
+void write_signames(FILE *stream)
 {
   register int i;
 

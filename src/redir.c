@@ -281,18 +281,12 @@ ecreate:
 }
 
 
-STATIC void
 #ifdef notyet
-dupredirect(redir, f, memory)
+static void dupredirect(union node *redir, int f, char memory[10])
 #else
-dupredirect(redir, f)
+static void dupredirect(union node *redir, int f)
 #endif
-	union node *redir;
-	int f;
-#ifdef notyet
-	char memory[10];
-#endif
-	{
+{
 	int fd = redir->nfile.fd;
 	int err = 0;
 
