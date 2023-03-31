@@ -494,7 +494,7 @@ evalsubshell(union node *n, int flags)
 		forkreset();
 		goto nofork;
 	}
-	jp = makejob(n, 1);
+	jp = makejob(1);
 	if (forkshell(jp, n, backgnd) == 0) {
 		flags |= EV_EXIT;
 		if (backgnd)
@@ -571,7 +571,7 @@ evalpipe(union node *n, int flags)
 		pipelen++;
 	flags |= EV_EXIT;
 	INTOFF;
-	jp = makejob(n, pipelen);
+	jp = makejob(pipelen);
 	prevfd = -1;
 	for (lp = n->npipe.cmdlist ; lp ; lp = lp->next) {
 		prehash(lp->n);
@@ -637,7 +637,7 @@ evalbackcmd(union node *n, struct backcmd *result)
 
 	if (pipe(pip) < 0)
 		sh_error("Pipe call failed");
-	jp = makejob(n, 1);
+	jp = makejob(1);
 	if (forkshell(jp, n, FORK_NOJOB) == 0) {
 		FORCEINTON;
 		close(pip[0]);

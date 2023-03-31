@@ -745,8 +745,7 @@ err:
  * Called with interrupts off.
  */
 
-struct job *
-makejob(union node *node, int nprocs)
+struct job *makejob(int nprocs)
 {
 	int i;
 	struct job *jp;
@@ -777,7 +776,7 @@ makejob(union node *node, int nprocs)
 	if (nprocs > 1) {
 		jp->ps = ckmalloc(nprocs * sizeof (struct procstat));
 	}
-	TRACE(("makejob(0x%lx, %d) returns %%%d\n", (long)node, nprocs,
+	TRACE(("makejob(%d) returns %%%d\n", nprocs,
 	    jobno(jp)));
 	return jp;
 }
@@ -960,7 +959,7 @@ struct job *vforkexec(union node *n, char **argv, const char *path, int idx)
 	struct job *jp;
 	int pid;
 
-	jp = makejob(n, 1);
+	jp = makejob(1);
 
 	sigblockall(NULL);
 	vforked++;

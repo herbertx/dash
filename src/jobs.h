@@ -102,7 +102,7 @@ int jobscmd(int, char **);
 struct output;
 void showjobs(struct output *, int);
 int waitcmd(int, char **);
-struct job *makejob(union node *, int);
+struct job *makejob(int);
 int forkshell(struct job *, union node *, int);
 struct job *vforkexec(union node *n, char **argv, const char *path, int idx);
 int waitforjob(struct job *);
