@@ -1023,6 +1023,19 @@ The shell treats each character of the
 .Ev IFS
 as a delimiter and uses the delimiters to split the results of parameter
 expansion and command substitution into fields.
+.Pp
+If
+.Ev IFS
+is empty, field splitting yields no fields if the input string was empty,
+and one string with the unchanged value of the input otherwise.
+For example, with the default
+.Ev IFS ,
+.Dq Ic read Fl r Ev l
+will remove any initial whitespace,
+but
+.Dq Ev IFS Ns = Ic read Fl r Ev l
+will leave the entire line in
+.Ev l .
 .Ss Pathname Expansion (File Name Generation)
 Unless the
 .Fl f
