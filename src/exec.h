@@ -62,6 +62,8 @@ union node;
 
 extern const char *pathopt;	/* set by padvance */
 
+struct stat64;
+
 void shellexec(char **, const char *, int)
     __attribute__((__noreturn__));
 int padvance_magic(const char **path, const char *name, int magic);
@@ -77,6 +79,9 @@ void defun(union node *);
 void unsetfunc(const char *);
 int typecmd(int, char **);
 int commandcmd(int, char **);
+
+int test_file_access(const char *path, int mode);
+int test_access(const struct stat64 *sp, int stmode);
 
 static inline int padvance(const char **path, const char *name)
 {

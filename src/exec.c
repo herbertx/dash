@@ -325,7 +325,22 @@ printentry(struct tblentry *cmdp)
 	out1fmt(snlfmt, cmdp->rehash ? "*" : nullstr);
 }
 
+static int test_exec(const char *fullname, struct stat64 *statb)
+{
+	if (!S_ISREG(statb->st_mode))
+		return 0;
 
+	if ((statb->st_mode & 0111) != 0111 &&
+#ifdef HAVE_FACCESSAT
+	    !test_file_access(fullname, X_OK)
+#else
+	    !test_access(statb, X_OK)
+#endif
+	   )
+		return 0;
+
+	return 1;
+}
 
 /*
  * Resolve a command name.  If you change this routine, you may have to
@@ -354,9 +369,12 @@ find_command(char *name, struct cmdentry *entry, int act, const char *path)
 				if (errno == EINTR)
 					continue;
 #endif
+absfail:
 				entry->cmdtype = CMDUNKNOWN;
 				return;
 			}
+			if (!test_exec(name, &statb))
+				goto absfail;
 		}
 		entry->cmdtype = CMDNORMAL;
 		return;
@@ -451,9 +469,6 @@ loop:
 				e = errno;
 			goto loop;
 		}
-		e = EACCES;	/* if we fail, this will be the error */
-		if (!S_ISREG(statb.st_mode))
-			continue;
 		if (lpathopt) {		/* this is a %func directory */
 			stalloc(len);
 			readcmdfile(fullname);
@@ -464,20 +479,9 @@ loop:
 			stunalloc(fullname);
 			goto success;
 		}
-#ifdef notdef
-		/* XXX this code stops root executing stuff, and is buggy
-		   if you need a group from the group list. */
-		if (statb.st_uid == geteuid()) {
-			if ((statb.st_mode & 0100) == 0)
-				goto loop;
-		} else if (statb.st_gid == getegid()) {
-			if ((statb.st_mode & 010) == 0)
-				goto loop;
-		} else {
-			if ((statb.st_mode & 01) == 0)
-				goto loop;
-		}
-#endif
+		e = EACCES;	/* if we fail, this will be the error */
+		if (!test_exec(fullname, &statb))
+			continue;
 		TRACE(("searchexec \"%s\" returns \"%s\"\n", name, fullname));
 		if (!updatetbl) {
 			entry->cmdtype = CMDNORMAL;

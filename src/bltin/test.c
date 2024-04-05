@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include "bltin.h"
+#include "../exec.h"
 
 /* test(1) accepts the following grammar:
 	oexpr	::= aexpr | aexpr "-o" oexpr ;
@@ -148,11 +149,6 @@ static int isoperand(char **);
 static int newerf(const char *, const char *);
 static int olderf(const char *, const char *);
 static int equalf(const char *, const char *);
-#ifdef HAVE_FACCESSAT
-static int test_file_access(const char *, int);
-#else
-static int test_access(const struct stat64 *, int);
-#endif
 
 #ifdef HAVE_FACCESSAT
 # ifdef HAVE_TRADITIONAL_FACCESSAT
@@ -527,7 +523,7 @@ static int has_exec_bit_set(const char *path)
 	return st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH);
 }
 
-static int test_file_access(const char *path, int mode)
+int test_file_access(const char *path, int mode)
 {
 	if (faccessat_confused_about_superuser() &&
 	    mode == X_OK && geteuid() == 0 && !has_exec_bit_set(path))
@@ -657,7 +653,7 @@ static int test_file_access(const char *path, int mode)
  * (euid==uid&&egid==gid), but uses st_mode for '-x' iff running as root.
  * i.e. it does strictly conform to 1003.1-2001 (and presumably 1003.2b).
  */
-static int test_access(const struct stat64 *sp, int stmode)
+int test_access(const struct stat64 *sp, int stmode)
 {
 	gid_t *groups;
 	register int n;
