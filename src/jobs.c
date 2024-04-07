@@ -187,11 +187,21 @@ set_curjob(struct job *jp, unsigned mode)
 
 int jobctl;
 
+static void xxtcsetpgrp(pid_t pgrp)
+{
+	int fd = ttyfd;
+
+	if (fd < 0)
+		return;
+
+	xtcsetpgrp(fd, pgrp);
+}
+
 void
 setjobctl(int on)
 {
+	int pgrp = -1;
 	int fd;
-	int pgrp;
 
 	if (on == jobctl || rootshell == 0)
 		return;
@@ -207,36 +217,43 @@ setjobctl(int on)
 		fd = savefd(fd, ofd);
 		do { /* while we are in the background */
 			if ((pgrp = tcgetpgrp(fd)) < 0) {
+close:
+				close(fd);
+				fd = -1;
 out:
+				if (!iflag)
+					break;
 				sh_warnx("can't access tty; job control turned off");
 				mflag = on = 0;
-				goto close;
+				return;
 			}
 			if (pgrp == getpgrp())
 				break;
+			if (!iflag)
+				goto close;
 			killpg(0, SIGTTIN);
 		} while (1);
 		initialpgrp = pgrp;
-
-		setsignal(SIGTSTP);
-		setsignal(SIGTTOU);
-		setsignal(SIGTTIN);
 		pgrp = rootpid;
-		setpgid(0, pgrp);
-		xtcsetpgrp(fd, pgrp);
 	} else {
 		/* turning job control off */
 		fd = ttyfd;
 		pgrp = initialpgrp;
-		xtcsetpgrp(fd, pgrp);
-		setpgid(0, pgrp);
-		setsignal(SIGTSTP);
-		setsignal(SIGTTOU);
-		setsignal(SIGTTIN);
-close:
-		close(fd);
-		fd = -1;
 	}
+
+	setsignal(SIGTSTP);
+	setsignal(SIGTTOU);
+	setsignal(SIGTTIN);
+	if (fd >= 0) {
+		setpgid(0, pgrp);
+		xtcsetpgrp(fd, pgrp);
+
+		if (!on) {
+			close(fd);
+			fd = -1;
+		}
+	}
+
 	ttyfd = fd;
 	jobctl = on;
 }
@@ -391,7 +408,7 @@ restartjob(struct job *jp, int mode)
 	jp->state = JOBRUNNING;
 	pgid = jp->ps->pid;
 	if (mode == FORK_FG)
-		xtcsetpgrp(ttyfd, pgid);
+		xxtcsetpgrp(pgid);
 	killpg(pgid, SIGCONT);
 	ps = jp->ps;
 	i = jp->nprocs;
@@ -874,7 +891,7 @@ static void forkchild(struct job *jp, union node *n, int mode)
 		/* This can fail because we are doing it in the parent also */
 		(void)setpgid(0, pgrp);
 		if (mode == FORK_FG)
-			xtcsetpgrp(ttyfd, pgrp);
+			xxtcsetpgrp(pgrp);
 		setsignal(SIGTSTP);
 		setsignal(SIGTTOU);
 	} else
@@ -1014,7 +1031,7 @@ waitforjob(struct job *jp)
 	st = getstatus(jp);
 #if JOBS
 	if (jp->jobctl) {
-		xtcsetpgrp(ttyfd, rootpid);
+		xxtcsetpgrp(rootpid);
 		/*
 		 * This is truly gross.
 		 * If we're doing job control, then we did a TIOCSPGRP which
