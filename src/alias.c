@@ -143,7 +143,8 @@ aliascmd(int argc, char **argv)
 		return (0);
 	}
 	while ((n = *++argv) != NULL) {
-		if ((v = strchr(n+1, '=')) == NULL) { /* n+1: funny ksh stuff */
+		/* n + 1: funny ksh stuff (from 44lite) */
+		if (!*n || !(v = strchr(n + 1, '='))) {
 			if ((ap = *__lookupalias(n)) == NULL) {
 				outfmt(out2, "%s: %s not found\n", "alias", n);
 				ret = 1;
