@@ -48,7 +48,7 @@
 #define VSTACK		0x10	/* text is allocated on the stack */
 #define VUNSET		0x20	/* the variable is not set */
 #define VNOFUNC		0x40	/* don't call the callback function */
-#define VNOSET		0x80	/* do not set variable - just readonly test */
+/* #define VNOSET	0x80	   do not set variable - just readonly test */
 #define VNOSAVE		0x100	/* when text is on the heap before setvareq */
 
 

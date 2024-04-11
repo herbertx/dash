@@ -267,9 +267,6 @@ struct var *setvareq(char *s, int flags)
 				 n);
 		}
 
-		if (flags & VNOSET)
-			goto out;
-
 		if (vp->func && (flags & VNOFUNC) == 0)
 			(*vp->func)(varnull(s));
 
@@ -291,8 +288,6 @@ out_free:
 
 		flags |= vp->flags & bits;
 	} else {
-		if (flags & VNOSET)
-			goto out;
 		if ((flags & (VEXPORT|VREADONLY|VSTRFIXED|VUNSET)) == VUNSET)
 			goto out_free;
 		/* not found */
