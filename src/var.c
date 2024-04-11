@@ -255,6 +255,8 @@ struct var *setvareq(char *s, int flags)
 	vpp = findvar(s);
 	vp = *vpp;
 	if (vp) {
+		unsigned bits;
+
 		if (vp->flags & VREADONLY) {
 			const char *n;
 
@@ -274,8 +276,11 @@ struct var *setvareq(char *s, int flags)
 		if ((vp->flags & (VTEXTFIXED|VSTACK)) == 0)
 			ckfree(vp->text);
 
-		if (((flags & (VEXPORT|VREADONLY|VSTRFIXED|VUNSET)) |
-		     (vp->flags & VSTRFIXED)) == VUNSET) {
+		if ((flags & (VEXPORT|VREADONLY|VSTRFIXED|VUNSET)) != VUNSET)
+			bits = ~(VTEXTFIXED|VSTACK|VNOSAVE|VUNSET);
+		else if ((vp->flags & VSTRFIXED))
+			bits = VSTRFIXED;
+		else {
 			*vpp = vp->next;
 			ckfree(vp);
 out_free:
@@ -284,7 +289,7 @@ out_free:
 			goto out;
 		}
 
-		flags |= vp->flags & ~(VTEXTFIXED|VSTACK|VNOSAVE|VUNSET);
+		flags |= vp->flags & bits;
 	} else {
 		if (flags & VNOSET)
 			goto out;
