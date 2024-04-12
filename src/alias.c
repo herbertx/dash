@@ -41,6 +41,7 @@
 #include "mystring.h"
 #include "alias.h"
 #include "options.h"	/* XXX for argptr (should remove?) */
+#include "syntax.h"
 
 #define ATABSIZE 39
 
@@ -55,6 +56,11 @@ void
 setalias(const char *name, const char *val)
 {
 	struct alias *ap, **app;
+	const char *p;
+
+	for (p = name; *p; p++)
+		if (BASESYNTAX[(signed char)*p] != CWORD)
+			sh_error("Invalid alias name: %s", name);
 
 	app = __lookupalias(name);
 	ap = *app;
