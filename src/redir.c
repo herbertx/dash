@@ -335,14 +335,14 @@ openhere(union node *redir)
 	int pip[2];
 	size_t len = 0;
 
-	if (pipe(pip) < 0)
-		sh_error("Pipe call failed");
-
 	p = redir->nhere.doc->narg.text;
 	if (redir->type == NXHERE) {
 		expandarg(redir->nhere.doc, NULL, EXP_QUOTED);
 		p = stackblock();
 	}
+
+	if (pipe(pip) < 0)
+		sh_error("Pipe call failed");
 
 	len = strlen(p);
 	if (len <= PIPESIZE) {
