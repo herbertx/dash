@@ -36,6 +36,8 @@
 
 #include "token.h"
 
+union node;
+
 /* control characters in argument strings */
 #define CTL_FIRST -127		/* first 'special' character */
 #define CTLESC -127		/* escape next character */
@@ -85,6 +87,7 @@ extern int checkkwd;
 
 
 int isassignment(const char *p);
+int issimplecmd(union node *n, const char *name);
 union node *parsecmd(int);
 void fixredir(union node *, const char *, int);
 const char *getprompt(void *);

@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "builtins.h"
 #include "shell.h"
 #include "main.h"
 #include "nodes.h"	/* for other headers */
@@ -47,6 +48,7 @@
 #include "options.h"
 #include "syntax.h"
 #include "output.h"
+#include "parser.h"
 #include "memalloc.h"
 #include "error.h"
 #include "trap.h"
@@ -170,8 +172,7 @@ void clear_traps(union node *n)
 	int simplecmd;
 	char **tp;
 
-	simplecmd = n && n->type == NCMD && n->ncmd.args &&
-		    equal(n->ncmd.args->narg.text, "trap");
+	simplecmd = issimplecmd(n, TRAPCMD->name);
 
 	INTOFF;
 	for (tp = trap ; tp < &trap[NSIG] ; tp++) {

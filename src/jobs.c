@@ -53,6 +53,7 @@
 #include <termios.h>
 #undef CEOF			/* syntax.h redefines this */
 #endif
+#include "builtins.h"
 #include "exec.h"
 #include "eval.h"
 #include "init.h"
@@ -911,6 +912,11 @@ static void forkchild(struct job *jp, union node *n, int mode)
 	}
 
 	if (lvforked)
+		return;
+
+	freejob(jp);
+
+	if (issimplecmd(n, JOBSCMD->name))
 		return;
 
 	for (jp = curjob; jp; jp = jp->prev_job)

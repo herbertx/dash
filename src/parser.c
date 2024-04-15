@@ -133,6 +133,12 @@ int isassignment(const char *p)
 	return *q == '=';
 }
 
+int issimplecmd(union node *n, const char *name)
+{
+	return n && n->type == NCMD && n->ncmd.args &&
+	       equal(n->ncmd.args->narg.text, name);
+}
+
 static inline int realeofmark(const char *eofmark)
 {
 	return eofmark && eofmark != FAKEEOFMARK;
