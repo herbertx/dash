@@ -1242,13 +1242,19 @@ commandtext(union node *n)
 {
 	char *name;
 
-	STARTSTACKSTR(cmdnextc);
-	cmdtxt(n);
+	STARTSTACKSTR(name);
+	commandtextcont(n, name);
 	name = stackblock();
 	TRACE(("commandtext: name %p, end %p\n", name, cmdnextc));
 	return savestr(name);
 }
 
+char *commandtextcont(union node *n, char *next)
+{
+	cmdnextc = next;
+	cmdtxt(n);
+	return cmdnextc;
+}
 
 STATIC void
 cmdtxt(union node *n)

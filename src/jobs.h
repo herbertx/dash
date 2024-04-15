@@ -107,6 +107,7 @@ int forkshell(struct job *, union node *, int);
 struct job *vforkexec(union node *n, char **argv, const char *path, int idx);
 int waitforjob(struct job *);
 int stoppedjobs(void);
+char *commandtextcont(union node *n, char *next);
 
 #if ! JOBS
 #define setjobctl(on) ((void)(on))	/* do nothing */

@@ -46,6 +46,7 @@
 #include "syntax.h"
 #include "options.h"
 #include "input.h"
+#include "jobs.h"
 #include "output.h"
 #include "var.h"
 #include "error.h"
@@ -628,9 +629,10 @@ parsefname(void)
 	union node *n = redirnode;
 
 	if (n->type == NHERE)
-		checkkwd = CHKEOFMARK;
+		checkkwd |= CHKEOFMARK;
 	if (readtoken() != TWORD)
 		synexpect(-1);
+	checkkwd &= ~CHKEOFMARK;
 	if (n->type == NHERE) {
 		struct heredoc *here = heredoc;
 		struct heredoc *p;
@@ -901,6 +903,7 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 	/* syntax stack */
 	struct synstack synbase = { .syntax = syntax };
 	struct synstack *synstack = &synbase;
+	int chkeofmark = checkkwd & CHKEOFMARK;
 
 	if (syntax == DQSYNTAX)
 		synstack->dblquote = 1;
@@ -1010,39 +1013,35 @@ toggledq:
 						synstack_pop(&synstack);
 					else if (synstack->dqvarnest > 0)
 						synstack->dqvarnest--;
-					USTPUTC(CTLENDVAR, out);
-				} else {
-					USTPUTC(c, out);
+					if (!chkeofmark)
+						c = CTLENDVAR;
 				}
+				USTPUTC(c, out);
 				break;
 			case CLP:	/* '(' in arithmetic */
 				synstack->parenlevel++;
 				USTPUTC(c, out);
 				break;
 			case CRP:	/* ')' in arithmetic */
-				if (synstack->parenlevel > 0) {
-					USTPUTC(c, out);
+				if (synstack->parenlevel > 0)
 					--synstack->parenlevel;
+				else if (pgetc_eatbnl() == ')') {
+					synstack_pop(&synstack);
+					if (chkeofmark)
+						USTPUTC(c, out);
+					else
+						c = CTLENDARI;
 				} else {
-					if (pgetc_eatbnl() == ')') {
-						USTPUTC(CTLENDARI, out);
-						synstack_pop(&synstack);
-					} else {
-						/*
-						 * unbalanced parens
-						 *  (don't 2nd guess - no error)
-						 */
-						pungetc();
-						USTPUTC(')', out);
-					}
+					/*
+					 * unbalanced parens
+					 *  (don't 2nd guess - no error)
+					 */
+					pungetc();
 				}
+				USTPUTC(c, out);
 				break;
 			case CBQUOTE:	/* '`' */
-				if (checkkwd & CHKEOFMARK) {
-					USTPUTC('`', out);
-					break;
-				}
-
+				USTPUTC('`', out);
 				PARSEBACKQOLD();
 				break;
 			case CEOF:
@@ -1218,13 +1217,16 @@ parsesub: {
 	static const char types[] = "}-+?=";
 
 	c = pgetc_eatbnl();
-	if (
-		(checkkwd & CHKEOFMARK) ||
-		(c != '(' && c != '{' && !is_name(c) && !is_special(c))
-	) {
+	if (c != '(' && c != '{' && !is_name(c) && !is_special(c)) {
 		USTPUTC('$', out);
 		pungetc();
-	} else if (c == '(') {	/* $(command) or $((arith)) */
+		goto parsesub_return;
+	}
+
+	USTPUTC('$', out);
+
+	if (c == '(') {		/* $(command) or $((arith)) */
+		USTPUTC(c, out);
 		if (pgetc_eatbnl() == '(') {
 			PARSEARITH();
 		} else {
@@ -1234,11 +1236,15 @@ parsesub: {
 	} else {
 		const char *newsyn = synstack->syntax;
 
-		USTPUTC(CTLVAR, out);
 		typeloc = out - (char *)stackblock();
-		STADJUST(1, out);
+		if (!chkeofmark) {
+			out[-1] = CTLVAR;
+			STADJUST(1, out);
+		}
 		subtype = VSNORMAL;
 		if (likely(c == '{')) {
+			if (chkeofmark)
+				USTPUTC('{', out);
 			c = pgetc_eatbnl();
 			subtype = 0;
 		}
@@ -1262,8 +1268,11 @@ varname:
 			if (!subtype && cc == '#') {
 				subtype = VSLENGTH;
 
-				if (c == '_' || isalnum(c))
+				if (c == '_' || isalnum(c)) {
+					if (chkeofmark)
+						USTPUTC('#', out);
 					goto varname;
+				}
 
 				cc = c;
 				c = pgetc_eatbnl();
@@ -1272,7 +1281,8 @@ varname:
 					subtype = 0;
 					c = cc;
 					cc = '#';
-				}
+				} else if (chkeofmark)
+					USTPUTC('#', out);
 			}
 
 			if (!is_special(cc)) {
@@ -1288,10 +1298,15 @@ varname:
 		if (subtype == 0) {
 			int cc = c;
 
+			if (chkeofmark)
+				STPUTC(c, out);
+
 			switch (c) {
 			case ':':
 				subtype = VSNUL;
 				c = pgetc_eatbnl();
+				if (chkeofmark)
+					STPUTC(c, out);
 				/*FALLTHROUGH*/
 			default:
 				p = strchr(types, c);
@@ -1304,9 +1319,11 @@ varname:
 				subtype = c == '#' ? VSTRIMLEFT :
 						     VSTRIMRIGHT;
 				c = pgetc_eatbnl();
-				if (c == cc)
+				if (c == cc) {
+					if (chkeofmark)
+						STPUTC(c, out);
 					subtype++;
-				else
+				} else
 					pungetc();
 
 				newsyn = BASESYNTAX;
@@ -1333,13 +1350,15 @@ badsub:
 			synstack->dblquote = newsyn != BASESYNTAX;
 		}
 
-		*((char *)stackblock() + typeloc) = subtype | VSBIT;
 		if (subtype != VSNORMAL) {
 			synstack->varnest++;
 			if (synstack->dblquote)
 				synstack->dqvarnest++;
 		}
-		STPUTC('=', out);
+		if (!chkeofmark) {
+			*((char *)stackblock() + typeloc) = subtype | VSBIT;
+			STPUTC('=', out);
+		}
 	}
 	goto parsesub_return;
 }
@@ -1353,14 +1372,19 @@ badsub:
  */
 
 parsebackq: {
-	struct nodelist **nlpp;
-	union node *n;
-	char *str;
-	size_t savelen;
-	struct heredoc *saveheredoclist;
 	int uninitialized_var(saveprompt);
+	struct heredoc *saveheredoclist;
+	struct nodelist **nlpp;
+	size_t psavelen;
+	size_t savelen;
+	union node *n;
+	char *pstr;
+	char *str;
 
-	USTPUTC(CTLBACKQ, out);
+	if (!chkeofmark) {
+		STADJUST(oldstyle - 1, out);
+		out[-1] = CTLBACKQ;
+	}
 	str = stackblock();
 	savelen = out - (char *)stackblock();
 	grabstackblock(savelen);
@@ -1370,9 +1394,6 @@ parsebackq: {
                    reread it as input, interpreting it normally.  */
                 char *pout;
                 int pc;
-                size_t psavelen;
-                char *pstr;
-
 
                 STARTSTACKSTR(pout);
 		for (;;) {
@@ -1405,10 +1426,8 @@ parsebackq: {
 done:
                 STPUTC('\0', pout);
                 psavelen = pout - (char *)stackblock();
-                if (psavelen > 0) {
-			pstr = grabstackstr(pout);
-			setinputstring(pstr);
-                }
+		pstr = grabstackstr(pout);
+		setinputstring(pstr);
         }
 	nlpp = &bqlist;
 	while (*nlpp)
@@ -1440,14 +1459,26 @@ done:
 	(*nlpp)->n = n;
 	/* Start reading from old file again. */
 	popfile();
-	/* Ignore any pushed back tokens left from the backquote parsing. */
-	if (oldstyle)
-		tokpushback = 0;
+
 	out = stnputs(str, savelen, stackblock());
-	if (oldstyle)
+
+	if (oldstyle) {
+		/* Ignore any pushed back tokens left from the backquote
+		 * parsing.
+		 */
+		tokpushback = 0;
+		if (chkeofmark) {
+			pstr[psavelen - 1] = '`';
+			out = stnputs(pstr, psavelen, out);
+		}
 		goto parsebackq_oldreturn;
-	else
+	} else {
+		if (chkeofmark) {
+			out = commandtextcont(n, out);
+			USTPUTC(')', out);
+		}
 		goto parsebackq_newreturn;
+	}
 }
 
 /*
@@ -1459,7 +1490,12 @@ parsearith: {
 		      synstack->prev ?: alloca(sizeof(*synstack)),
 		      ARISYNTAX);
 	synstack->dblquote = 1;
-	USTPUTC(CTLARI, out);
+	if (chkeofmark)
+		USTPUTC(c, out);
+	else {
+		STADJUST(-1, out);
+		out[-1] = CTLARI;
+	}
 	goto parsearith_return;
 }
 
