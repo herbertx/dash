@@ -34,7 +34,9 @@
  *	@(#)init.h	8.2 (Berkeley) 5/4/95
  */
 
+union node;
+
 void init(void);
 void exitreset(void);
-void forkreset(void);
+void forkreset(union node *);
 void reset(void);

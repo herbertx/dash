@@ -66,7 +66,9 @@
 
 
 /* trap handler commands */
-MKINIT char *trap[NSIG];
+static char *trap[NSIG];
+/* traps have not been fully cleared */
+static int ptrap;
 /* number of non-null traps */
 int trapcnt;
 /* current value of signal */
@@ -81,6 +83,7 @@ volatile sig_atomic_t gotsigchld;
 extern char *signal_names[];
 
 static int decode_signum(const char *);
+MKINIT void clear_traps(union node *);
 
 #ifdef mkinit
 INCLUDE "memalloc.h"
@@ -92,19 +95,7 @@ INIT {
 }
 
 FORKRESET {
-	char **tp;
-
-	INTOFF;
-	for (tp = trap ; tp < &trap[NSIG] ; tp++) {
-		if (*tp && **tp) {	/* trap not NULL or SIG_IGN */
-			ckfree(*tp);
-			*tp = NULL;
-			if (tp != &trap[0])
-				setsignal(tp - trap);
-		}
-	}
-	trapcnt = 0;
-	INTON;
+	clear_traps(n);
 }
 #endif
 
@@ -133,6 +124,8 @@ trapcmd(int argc, char **argv)
 		}
 		return 0;
 	}
+	if (ptrap)
+		clear_traps(NULL);
 	if (!ap[1] || decode_signum(*ap) >= 0)
 		action = NULL;
 	else
@@ -164,6 +157,40 @@ trapcmd(int argc, char **argv)
 		ap++;
 	}
 	return 0;
+}
+
+
+
+/*
+ * Clear traps on a fork.
+ */
+
+void clear_traps(union node *n)
+{
+	int simplecmd;
+	char **tp;
+
+	simplecmd = n && n->type == NCMD && n->ncmd.args &&
+		    equal(n->ncmd.args->narg.text, "trap");
+
+	INTOFF;
+	for (tp = trap ; tp < &trap[NSIG] ; tp++) {
+		if (*tp && **tp) {	/* trap not NULL or SIG_IGN */
+			char *otp = *tp;
+
+			*tp = NULL;
+			if (tp != &trap[0])
+				setsignal(tp - trap);
+
+			if (simplecmd)
+				*tp = otp;
+			else
+				ckfree(*tp);
+		}
+	}
+	trapcnt = 0;
+	ptrap = simplecmd;
+	INTON;
 }
 
 
@@ -390,6 +417,8 @@ exitshell(void)
 	handler = &loc;
 	if ((p = trap[0])) {
 		trap[0] = NULL;
+		if (ptrap)
+			goto out;
 		evalskip = 0;
 		evalstring(p, 0);
 		evalskip = SKIPFUNCDEF;

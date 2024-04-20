@@ -872,7 +872,7 @@ static void forkchild(struct job *jp, union node *n, int mode)
 	if (!lvforked) {
 		shlvl++;
 
-		forkreset();
+		forkreset(mode == FORK_NOJOB ? n : NULL);
 
 #if JOBS
 		/* do job control only in root shell */

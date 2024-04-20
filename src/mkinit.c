@@ -91,6 +91,7 @@ struct event {
 	char *name;		/* name of event (e.g. INIT) */
 	char *routine;		/* name of routine called on event */
 	char *comment;		/* comment describing routine */
+	char *args;		/* arguments to routine */
 	struct text code;	/* code for handling event */
 };
 
@@ -128,7 +129,7 @@ char reset[] = "\
 struct event event[] = {
 	{"INIT", "init", init},
 	{"EXITRESET", "exitreset", exitreset},
-	{"FORKRESET", "forkreset", forkreset},
+	{"FORKRESET", "forkreset", forkreset, "union node *n"},
 	{"RESET", "reset", reset},
 	{NULL, NULL}
 };
@@ -388,7 +389,7 @@ output(void)
 	for (ep = event ; ep->name ; ep++) {
 		fputs("\n\n\n", fp);
 		fputs(ep->comment, fp);
-		fprintf(fp, "\nvoid\n%s() {\n", ep->routine);
+		fprintf(fp, "\nvoid\n%s(%s) {\n", ep->routine, ep->args ?: "");
 		writetext(&ep->code, fp);
 		fprintf(fp, "}\n");
 	}

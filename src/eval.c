@@ -491,11 +491,11 @@ evalsubshell(union node *n, int flags)
 	expredir(n->nredir.redirect);
 	INTOFF;
 	if (!backgnd && flags & EV_EXIT && !have_traps()) {
-		forkreset();
+		forkreset(NULL);
 		goto nofork;
 	}
 	jp = makejob(1);
-	if (forkshell(jp, n, backgnd) == 0) {
+	if (forkshell(jp, n->nredir.n, backgnd) == 0) {
 		flags |= EV_EXIT;
 		if (backgnd)
 			flags &=~ EV_TESTED;
