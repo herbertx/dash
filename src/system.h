@@ -54,6 +54,13 @@ static inline void sigclearmask(void)
 #endif
 }
 
+#ifndef HAVE_MEMFD_CREATE
+static inline int memfd_create(const char *name, unsigned int flags)
+{
+	return -1;
+}
+#endif
+
 #ifndef HAVE_MEMPCPY
 void *mempcpy(void *, const void *, size_t);
 #endif

@@ -50,4 +50,5 @@ int redirectsafe(union node *, int);
 void unwindredir(struct redirtab *stop);
 struct redirtab *pushredir(union node *redir);
 int sh_open(const char *pathname, int flags, int mayfail);
+int sh_pipe(int pip[2], int memfd);
 

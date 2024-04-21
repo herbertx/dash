@@ -32,6 +32,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>	/* PIPE_BUF */
@@ -280,6 +281,21 @@ ecreate:
 	sh_open_fail(fname, O_CREAT, EEXIST);
 }
 
+static int sh_dup2(int ofd, int nfd, int cfd)
+{
+	if (nfd < 0) {
+		nfd = dup(ofd);
+		if (nfd >= 0)
+			cfd = -1;
+	} else
+		nfd = dup2(ofd, nfd);
+	if (likely(cfd >= 0))
+		close(cfd);
+	if (nfd < 0)
+		sh_error("%d: %s", ofd, strerror(errno));
+
+	return nfd;
+}
 
 #ifdef notyet
 static void dupredirect(union node *redir, int f, char memory[10])
@@ -288,7 +304,6 @@ static void dupredirect(union node *redir, int f)
 #endif
 {
 	int fd = redir->nfile.fd;
-	int err = 0;
 
 #ifdef notyet
 	memory[fd] = 0;
@@ -301,26 +316,31 @@ static void dupredirect(union node *redir, int f)
 				memory[fd] = 1;
 			else
 #endif
-				if (dup2(f, fd) < 0) {
-					err = errno;
-					goto err;
-				}
+				sh_dup2(f, fd, -1);
 			return;
 		}
 		f = fd;
-	} else if (dup2(f, fd) < 0)
-		err = errno;
+	} else
+		sh_dup2(f, fd, f);
 
 	close(f);
-	if (err < 0)
-		goto err;
-
-	return;
-
-err:
-	sh_error("%d: %s", f, strerror(err));
 }
 
+int sh_pipe(int pip[2], int memfd)
+{
+	if (memfd) {
+		pip[0] = memfd_create("dash", 0);
+		if (pip[0] >= 0) {
+			pip[1] = sh_dup2(pip[0], -1, pip[0]);
+			return 1;
+		}
+	}
+
+	if (pipe(pip) < 0)
+		sh_error("Pipe call failed");
+
+	return 0;
+}
 
 /*
  * Handle here documents.  Normally we fork off a process to write the
@@ -331,9 +351,10 @@ err:
 STATIC int
 openhere(union node *redir)
 {
-	char *p;
-	int pip[2];
 	size_t len = 0;
+	int pip[2];
+	int memfd;
+	char *p;
 
 	p = redir->nhere.doc->narg.text;
 	if (redir->type == NXHERE) {
@@ -341,12 +362,12 @@ openhere(union node *redir)
 		p = stackblock();
 	}
 
-	if (pipe(pip) < 0)
-		sh_error("Pipe call failed");
-
 	len = strlen(p);
-	if (len <= PIPESIZE) {
+	memfd = sh_pipe(pip, len > PIPESIZE);
+
+	if (memfd || len <= PIPESIZE) {
 		xwrite(pip[1], p, len);
+		lseek(pip[1], 0, SEEK_SET);
 		goto out;
 	}
 

@@ -635,8 +635,7 @@ evalbackcmd(union node *n, struct backcmd *result)
 		goto out;
 	}
 
-	if (pipe(pip) < 0)
-		sh_error("Pipe call failed");
+	sh_pipe(pip, 0);
 	jp = makejob(1);
 	if (forkshell(jp, n, FORK_NOJOB) == 0) {
 		FORCEINTON;
