@@ -112,7 +112,7 @@ main(int argc, char **argv)
 
 		s = state;
 		if (e == EXEND || e == EXEXIT || s == 0 || iflag == 0 || shlvl)
-			exitshell();
+			goto exit;
 
 		reset();
 
@@ -175,6 +175,7 @@ state3:
 state4:	/* XXX ??? - why isn't this before the "if" statement */
 		cmdloop(1);
 	}
+exit:
 #if PROFILE
 	monitor(0);
 #endif
