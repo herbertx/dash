@@ -301,7 +301,7 @@ again:
 		switch (c) {
 		case '\n':
 			parsefile->nleft = q - parsefile->nextc - 1;
-			goto check;
+			goto done;
 
 		default:
 			something = 1;
@@ -320,6 +320,7 @@ check:
 			break;
 		}
 	}
+done:
 	input_set_lleft(parsefile, more);
 
 	if (!IS_DEFINED_SMALL)
