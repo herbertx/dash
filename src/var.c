@@ -622,12 +622,7 @@ void unsetvar(const char *s)
 STATIC struct var **
 hashvar(const char *p)
 {
-	unsigned int hashval;
-
-	hashval = ((unsigned char) *p) << 4;
-	while (*p && *p != '=')
-		hashval += (unsigned char) *p++;
-	return &vartab[hashval % VTABSIZE];
+	return &vartab[hashval(p) % VTABSIZE];
 }
 
 
@@ -641,19 +636,19 @@ hashvar(const char *p)
 int
 varcmp(const char *p, const char *q)
 {
-	int c, d;
-
-	while ((c = *p) == (d = *q)) {
-		if (!c || c == '=')
-			goto out;
+	int c = *p, d = *q;
+	while (c == d) {
+		if (!c)
+			break;
 		p++;
 		q++;
+		c = *p;
+		d = *q;
+		if (c == '=')
+			c = '\0';
+		if (d == '=')
+			d = '\0';
 	}
-	if (c == '=')
-		c = 0;
-	if (d == '=')
-		d = 0;
-out:
 	return c - d;
 }
 

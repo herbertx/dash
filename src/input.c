@@ -387,7 +387,7 @@ pushstring(char *s, void *ap)
 	sp->ap = (struct alias *)ap;
 	if (ap) {
 		((struct alias *)ap)->flag |= ALIASINUSE;
-		sp->string = s;
+		sp->string = ((struct alias *)ap)->name;
 	}
 	parsefile->nextc = s;
 	parsefile->nleft = len;
@@ -406,7 +406,7 @@ static void popstring(void)
 		    parsefile->nextc[-1] == '\t') {
 			checkkwd |= CHKALIAS;
 		}
-		if (sp->string != sp->ap->val) {
+		if (sp->string != sp->ap->name) {
 			ckfree(sp->string);
 		}
 	}

@@ -153,6 +153,21 @@ int unsetcmd(int, char **);
 void unsetvar(const char *);
 int varcmp(const char *, const char *);
 
+static inline unsigned int hashval(const char *p)
+{
+	unsigned int hashval;
+
+	hashval = ((unsigned char) *p) << 4;
+	while (*p) {
+		hashval += (unsigned char) *p++;
+		if (*p == '=')
+			break;
+	}
+
+	return hashval;
+}
+
+
 static inline int varequal(const char *a, const char *b) {
 	return !varcmp(a, b);
 }
