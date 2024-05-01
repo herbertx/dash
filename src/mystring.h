@@ -48,7 +48,7 @@ extern const char spcstr[];
 extern const char dolatstr[];
 #define DOLATSTRLEN 6
 extern const char cqchars[];
-#define qchars (cqchars + FNMATCH_IS_ENABLED)
+#define qchars (cqchars + FNMATCH_IS_ENABLED + 1)
 extern const char illnum[];
 extern const char homestr[];
 

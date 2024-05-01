@@ -1658,6 +1658,7 @@ _rmescapes(char *str, int flag)
 	char *p, *q, *r;
 	int notescaped;
 	int globbing;
+	int inquotes;
 
 	p = strpbrk(str, cqchars);
 	if (!p) {
@@ -1692,16 +1693,17 @@ _rmescapes(char *str, int flag)
 			q = mempcpy(q, str, len);
 		}
 	}
+	inquotes = 0;
 	notescaped = globbing;
 	while (*p) {
 		if (*p == (char)CTLQUOTEMARK) {
 			p++;
-			notescaped = globbing;
+			inquotes ^= globbing;
 			continue;
 		}
 		if (*p == '\\') {
 			/* naked back slash */
-			notescaped = 0;
+			notescaped ^= globbing;
 			goto copy;
 		}
 		if (FNMATCH_IS_ENABLED && *p == '^')
@@ -1711,6 +1713,10 @@ _rmescapes(char *str, int flag)
 add_escape:
 			if (notescaped)
 				*q++ = '\\';
+			else if (inquotes) {
+				*q++ = '\\';
+				*q++ = '\\';
+			}
 		}
 		notescaped = globbing;
 copy:
