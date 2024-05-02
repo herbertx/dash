@@ -401,7 +401,7 @@ static void popstring(void)
 	struct strpush *sp = parsefile->strpush;
 
 	INTOFF;
-	if (sp->ap) {
+	if (sp->ap && parsefile->nextc > sp->string) {
 		if (parsefile->nextc[-1] == ' ' ||
 		    parsefile->nextc[-1] == '\t') {
 			checkkwd |= CHKALIAS;
