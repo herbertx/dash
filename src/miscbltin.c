@@ -237,7 +237,7 @@ umaskcmd(int argc, char **argv)
 				*ap++ = ',';
 			}
 			ap[-1] = '\0';
-			out1fmt("%s\n", buf);
+			out1fmt(snlfmt, buf);
 		} else {
 			out1fmt("%.4o\n", mask);
 		}

@@ -345,7 +345,7 @@ usage:
 			pid = **argv == '-' ?
 				-number(*argv + 1) : number(*argv);
 		if (kill(pid, signo) != 0) {
-			sh_warnx("%s\n", strerror(errno));
+			sh_warnx(snlfmt, strerror(errno));
 			i = 1;
 		}
 	} while (*++argv);
