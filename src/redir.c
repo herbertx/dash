@@ -319,11 +319,9 @@ static void dupredirect(union node *redir, int f)
 				sh_dup2(f, fd, -1);
 			return;
 		}
-		f = fd;
+		close(fd);
 	} else
 		sh_dup2(f, fd, f);
-
-	close(f);
 }
 
 int sh_pipe(int pip[2], int memfd)
