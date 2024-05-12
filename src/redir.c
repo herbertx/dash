@@ -56,6 +56,7 @@
 #include "output.h"
 #include "memalloc.h"
 #include "error.h"
+#include "system.h"
 #include "trap.h"
 
 
