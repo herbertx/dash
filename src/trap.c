@@ -296,11 +296,11 @@ setsignal(int signo)
 void
 ignoresig(int signo)
 {
-	if (sigmode[signo - 1] != S_IGN && sigmode[signo - 1] != S_HARD_IGN) {
-		signal(signo, SIG_IGN);
-	}
+	if (sigmode[signo - 1] == S_IGN || sigmode[signo - 1] == S_HARD_IGN)
+		return;
+	signal(signo, SIG_IGN);
 	if (!vforked)
-		sigmode[signo - 1] = S_HARD_IGN;
+		sigmode[signo - 1] = S_IGN;
 }
 
 
