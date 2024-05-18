@@ -47,10 +47,9 @@
  * Like malloc, but returns an error when out of space.
  */
 
-pointer
-ckmalloc(size_t nbytes)
+void *ckmalloc(size_t nbytes)
 {
-	pointer p;
+	void *p;
 
 	p = malloc(nbytes);
 	if (p == NULL)
@@ -63,8 +62,7 @@ ckmalloc(size_t nbytes)
  * Same for realloc.
  */
 
-pointer
-ckrealloc(pointer p, size_t nbytes)
+void *ckrealloc(void *p, size_t nbytes)
 {
 	p = realloc(p, nbytes);
 	if (p == NULL)
@@ -110,8 +108,7 @@ char *stacknxt = stackbase.space;
 size_t stacknleft = MINSIZE;
 char *sstrend = stackbase.space + MINSIZE;
 
-pointer
-stalloc(size_t nbytes)
+void *stalloc(size_t nbytes)
 {
 	char *p;
 	size_t aligned;
@@ -144,8 +141,7 @@ stalloc(size_t nbytes)
 }
 
 
-void
-stunalloc(pointer p)
+void stunalloc(void *p)
 {
 #ifdef DEBUG
 	if (!p || (stacknxt < (char *)p) || ((char *)p < stackp->space)) {
@@ -221,7 +217,7 @@ static void growstackblock(size_t min)
 		sp = stackp;
 		prevstackp = sp->prev;
 		grosslen = newlen + sizeof(struct stack_block) - MINSIZE;
-		sp = ckrealloc((pointer)sp, grosslen);
+		sp = ckrealloc(sp, grosslen);
 		sp->prev = prevstackp;
 		stackp = sp;
 		stacknxt = sp->space;

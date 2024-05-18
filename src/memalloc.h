@@ -48,11 +48,11 @@ extern char *stacknxt;
 extern size_t stacknleft;
 extern char *sstrend;
 
-pointer ckmalloc(size_t);
-pointer ckrealloc(pointer, size_t);
+void *ckmalloc(size_t);
+void *ckrealloc(void *, size_t);
 char *savestr(const char *);
-pointer stalloc(size_t);
-void stunalloc(pointer);
+void *stalloc(size_t);
+void stunalloc(void *);
 void pushstackmark(struct stackmark *mark, size_t len);
 void setstackmark(struct stackmark *);
 void popstackmark(struct stackmark *);
@@ -98,4 +98,4 @@ static inline char *_STPUTC(int c, char *p) {
 #define ungrabstackstr(s, p) stunalloc((s))
 #define stackstrend() ((void *)sstrend)
 
-#define ckfree(p)	free((pointer)(p))
+#define ckfree(p)	free((void *)(p))
