@@ -118,6 +118,64 @@ long sysconf(int) __attribute__((__noreturn__));
 int isblank(int c);
 #endif
 
+#ifndef HAVE_FNMATCH
+static inline int fnmatch(const char *pattern, const char *string, int flags)
+{
+	return -1;
+}
+#endif
+
+#ifndef HAVE_GLOB
+#define GLOB_ERR	(1 << 0)/* Return on read errors.  */
+#define GLOB_MARK	(1 << 1)/* Append a slash to each name.  */
+#define GLOB_NOSORT	(1 << 2)/* Don't sort the names.  */
+#define GLOB_DOOFFS	(1 << 3)/* Insert PGLOB->gl_offs NULLs.  */
+#define GLOB_NOCHECK	(1 << 4)/* If nothing matches, return the pattern.  */
+#define GLOB_APPEND	(1 << 5)/* Append to results of a previous call.  */
+#define GLOB_NOESCAPE	(1 << 6)/* Backslashes don't quote metacharacters.  */
+#define GLOB_PERIOD	(1 << 7)/* Leading `.' can be matched by metachars.  */
+#define GLOB_MAGCHAR	(1 << 8)/* Set in gl_flags if any metachars seen.  */
+#define GLOB_ALTDIRFUNC (1 << 9)/* Use gl_opendir et al functions.  */
+#define GLOB_BRACE	(1 << 10)/* Expand "{a,b}" to "a" "b".  */
+#define GLOB_NOMAGIC	(1 << 11)/* If no magic chars, return the pattern.  */
+#define GLOB_TILDE	(1 << 12)/* Expand ~user and ~ to home directories. */
+#define GLOB_ONLYDIR	(1 << 13)/* Match only directories.  */
+#define GLOB_TILDE_CHECK (1 << 14)/* Like GLOB_TILDE but return an error
+				     if the user name is not available.  */
+
+#define GLOB_NOSPACE	1	/* Ran out of memory.  */
+#define GLOB_ABORTED	2	/* Read error.  */
+#define GLOB_NOMATCH	3	/* No matches found.  */
+#define GLOB_NOSYS	4	/* Not implemented.  */
+
+struct dirent64;
+struct stat64;
+
+typedef struct {
+	size_t gl_pathc;
+	char **gl_pathv;
+	size_t gl_offs;
+	int gl_flags;
+
+	void (*gl_closedir)(void *);
+	struct dirent64 *(*gl_readdir)(void *);
+	void *(*gl_opendir)(const char *);
+	int (*gl_lstat)(const char *, struct stat64 *);
+	int (*gl_stat)(const char *, struct stat64 *);
+} glob64_t;
+
+static inline int glob64(const char *pattern, int flags,
+			 int (*errfunc)(const char *epath, int eerrno),
+			 glob64_t *restrict pglob)
+{
+	return -1;
+}
+
+static inline void globfree64(glob64_t *pglob)
+{
+}
+#endif
+
 /*
  * A trick to suppress uninitialized variable warning without generating any
  * code

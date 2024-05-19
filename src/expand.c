@@ -119,20 +119,13 @@ static size_t strtodest(const char *p, int flags);
 static size_t memtodest(const char *p, size_t len, int flags);
 STATIC ssize_t varvalue(char *, int, int, int);
 STATIC void expandmeta(struct strlist *);
-#ifdef HAVE_GLOB
 static void addglob(const glob64_t *);
-#else
 STATIC void expmeta(char *, unsigned, unsigned);
 STATIC struct strlist *expsort(struct strlist *);
 STATIC struct strlist *msort(struct strlist *, int);
-#endif
 STATIC void addfname(char *);
 STATIC int patmatch(char *, const char *);
-#ifndef HAVE_FNMATCH
 STATIC int pmatch(const char *, const char *);
-#else
-#define pmatch(a, b) !fnmatch((a), (b), 0)
-#endif
 static size_t cvtnum(intmax_t num, int flags);
 STATIC size_t esclen(const char *, const char *);
 STATIC void varunset(const char *, const char *, const char *, int)
@@ -1156,9 +1149,8 @@ out:
  * should be escapes.  The results are stored in the list exparg.
  */
 
-#ifdef HAVE_GLOB
 #ifdef __GLIBC__
-void *opendir_interruptible(const char *pathname)
+static void *opendir_interruptible(const char *pathname)
 {
 	if (int_pending()) {
 		suppressint = 0;
@@ -1171,11 +1163,8 @@ void *opendir_interruptible(const char *pathname)
 #define GLOB_ALTDIRFUNC 0
 #endif
 
-STATIC void
-expandmeta(struct strlist *str)
+static void expandmeta_glob(struct strlist *str)
 {
-	/* TODO - EXP_REDIR */
-
 	while (str) {
 		const char *p;
 		glob64_t pglob;
@@ -1236,8 +1225,6 @@ static void addglob(const glob64_t *pglob)
 	} while (*++p);
 }
 
-
-#else	/* HAVE_GLOB */
 STATIC char *expdir;
 STATIC unsigned expdir_max;
 
@@ -1249,6 +1236,9 @@ expandmeta(struct strlist *str)
 		'*', '?', '[', 0
 	};
 	/* TODO - EXP_REDIR */
+
+	if (GLOB_IS_ENABLED)
+		return expandmeta_glob(str);
 
 	while (str) {
 		struct strlist **savelastp;
@@ -1416,7 +1406,6 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 	if (! atend)
 		endname[-esc - 1] = esc ? '\\' : '/';
 }
-#endif	/* HAVE_GLOB */
 
 
 /*
@@ -1435,7 +1424,6 @@ addfname(char *name)
 }
 
 
-#ifndef HAVE_GLOB
 /*
  * Sort the results of file name expansion.  It calculates the number of
  * strings to sort and then calls msort (short for merge sort) to do the
@@ -1494,7 +1482,6 @@ msort(struct strlist *list, int len)
 	}
 	return list;
 }
-#endif
 
 
 /*
@@ -1510,7 +1497,6 @@ patmatch(char *pattern, const char *string)
 }
 
 
-#ifndef HAVE_FNMATCH
 STATIC int ccmatch(const char *p, int chr, const char **r)
 {
 	static const struct class {
@@ -1552,6 +1538,9 @@ pmatch(const char *pattern, const char *string)
 {
 	const char *p, *q;
 	char c;
+
+	if (FNMATCH_IS_ENABLED)
+		return !fnmatch(pattern, string, 0);
 
 	p = pattern;
 	q = string;
@@ -1644,7 +1633,6 @@ breakloop:
 		return 0;
 	return 1;
 }
-#endif
 
 
 

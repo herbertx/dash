@@ -39,8 +39,14 @@
 
 #ifdef HAVE_FNMATCH
 #define FNMATCH_IS_ENABLED 1
+#ifdef HAVE_GLOB
+#define GLOB_IS_ENABLED 1
+#else
+#define GLOB_IS_ENABLED 0
+#endif
 #else
 #define FNMATCH_IS_ENABLED 0
+#define GLOB_IS_ENABLED 0
 #endif
 
 extern const char snlfmt[];
