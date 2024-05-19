@@ -37,8 +37,8 @@ if test "$enable_static" = "yes"; then
 	export LDFLAGS="-static"
 fi
 
-AC_ARG_ENABLE(fnmatch, AS_HELP_STRING(--disable-fnmatch, \
-				      [Do not use fnmatch(3) from libc]))
+AC_ARG_ENABLE(fnmatch, AS_HELP_STRING(--enable-fnmatch, \
+				      [Use fnmatch(3) from libc]))
 AC_ARG_ENABLE(glob, AS_HELP_STRING(--enable-glob, [Use glob(3) from libc]))
 
 dnl Checks for libraries.
@@ -122,7 +122,7 @@ if test "$enable_test_workaround" = "yes"; then
 		[Define if your faccessat tells root all files are executable])
 fi
 
-if test "$enable_fnmatch" != no; then
+if test "$enable_fnmatch" = yes; then
 	use_fnmatch=
 	AC_CHECK_FUNCS(fnmatch, use_fnmatch=yes)
 fi
