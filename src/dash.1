@@ -2251,8 +2251,13 @@ show or set the limit on the real-time scheduling priority of a process
 .Pp
 If none of these is specified, it is the limit on file size that is shown
 or set.
-If value is specified, the limit is set to that number; otherwise
-the current limit is displayed.
+If
+.Ar value
+is specified, the limit is set to that number; otherwise
+the current limit is displayed.  The special
+.Ar value
+.Cm unlimited
+represents the lack of any limit.
 .Pp
 Limits of an arbitrary process can be displayed or set using the
 .Xr sysctl 8
