@@ -93,7 +93,7 @@ struct var varinit[] = {
 	{ 0,	VSTRFIXED|VTEXTFIXED,		"PS1=$ ",	0 },
 	{ 0,	VSTRFIXED|VTEXTFIXED,		"PS2=> ",	0 },
 	{ 0,	VSTRFIXED|VTEXTFIXED,		"PS4=+ ",	0 },
-	{ 0,	VSTRFIXED|VTEXTFIXED,		defoptindvar,	getoptsreset },
+	{ 0,	VSTRFIXED|VTEXTFIXED|VNOFUNC,	defoptindvar,	getoptsreset },
 #ifdef WITH_LINENO
 	{ 0,	VSTRFIXED|VTEXTFIXED,		linenovar,	0 },
 #endif
@@ -531,7 +531,7 @@ poplocalvars(void)
 			vp->flags &= ~(VSTRFIXED|VREADONLY);
 			unsetvar(vp->text);
 		} else {
-			if (vp->func)
+			if (vp->func && !(vp->flags & VNOFUNC))
 				(*vp->func)(varnull(lvp->text));
 			if ((vp->flags & (VTEXTFIXED|VSTACK)) == 0)
 				ckfree(vp->text);
