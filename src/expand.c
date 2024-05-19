@@ -1580,7 +1580,7 @@ pmatch(const char *pattern, const char *string)
 
 			startp = p;
 			invert = 0;
-			if (*p == '!') {
+			if (*p == '!' || *p == '^') {
 				invert++;
 				p++;
 			}
@@ -1694,11 +1694,8 @@ _rmescapes(char *str, int flag)
 			notescaped ^= globbing;
 			goto copy;
 		}
-		if (FNMATCH_IS_ENABLED && *p == '^')
-			goto add_escape;
 		if (*p == (char)CTLESC) {
 			p++;
-add_escape:
 			if (notescaped)
 				*q++ = '\\';
 			else if (inquotes) {

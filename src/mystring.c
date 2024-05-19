@@ -64,9 +64,6 @@ const char dolatstr[] = { CTLQUOTEMARK, CTLVAR, VSNORMAL | VSBIT, '@', '=',
 			  CTLQUOTEMARK, '\0' };
 const char cqchars[] = {
 	'\\',
-#ifdef HAVE_FNMATCH
-	'^',
-#endif
 	CTLESC, CTLQUOTEMARK, 0
 };
 const char illnum[] = "Illegal number: %s";

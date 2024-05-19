@@ -178,14 +178,14 @@ main(int argc, char **argv)
 	add("$", "CVAR");
 	add("}", "CENDVAR");
 	/* ':/' for tilde expansion, '-' for [a\-x] pattern ranges */
-	add("!*?[=~:/-]", "CCTL");
+	add("^!*?[=~:/-]", "CCTL");
 	print("dqsyntax");
 	init();
 	fputs("\n/* syntax table used when in single quotes */\n", cfile);
 	add("\n", "CNL");
 	add("'", "CENDQUOTE");
 	/* ':/' for tilde expansion, '-' for [a\-x] pattern ranges */
-	add("!*?[=~:/-]\\", "CCTL");
+	add("^!*?[=~:/-]\\", "CCTL");
 	print("sqsyntax");
 	init();
 	fputs("\n/* syntax table used when in arithmetic */\n", cfile);
