@@ -1127,7 +1127,7 @@ more_heredoc:
 			len = out - p;
 
 			if (len) {
-				len -= c < 0;
+				len -= c <= PEOF;
 				c = p[-1];
 
 				if (len) {
