@@ -765,8 +765,9 @@ err:
 
 struct job *makejob(int nprocs)
 {
-	int i;
+	struct procstat *ps;
 	struct job *jp;
+	int i;
 
 	for (i = njobs, jp = jobtab ; ; jp++) {
 		if (--i < 0) {
@@ -783,6 +784,9 @@ struct job *makejob(int nprocs)
 		break;
 	}
 	memset(jp, 0, sizeof(*jp));
+	ps = &jp->ps0;
+	if (nprocs > 1)
+		ps = ckmalloc(nprocs * sizeof(*ps));
 #if JOBS
 	if (jobctl)
 		jp->jobctl = 1;
@@ -790,10 +794,7 @@ struct job *makejob(int nprocs)
 	jp->prev_job = curjob;
 	curjob = jp;
 	jp->used = 1;
-	jp->ps = &jp->ps0;
-	if (nprocs > 1) {
-		jp->ps = ckmalloc(nprocs * sizeof (struct procstat));
-	}
+	jp->ps = ps;
 	TRACE(("makejob(%d) returns %%%d\n", nprocs,
 	    jobno(jp)));
 	return jp;
