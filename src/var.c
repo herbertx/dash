@@ -143,7 +143,7 @@ INIT {
 
 	p = lookupvar("PWD");
 	if (p)
-		if (*p != '/' || stat64(p, &st1) || stat64(".", &st2) ||
+		if (*p != '/' || stat64(p, &st1) || stat64(dotdir, &st2) ||
 		    st1.st_dev != st2.st_dev || st1.st_ino != st2.st_ino)
 			p = 0;
 	setpwd(p, 0);

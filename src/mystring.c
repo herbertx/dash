@@ -68,6 +68,7 @@ const char cqchars[] = {
 };
 const char illnum[] = "Illegal number: %s";
 const char homestr[] = "HOME";
+const char dotdir[] = ".";
 
 /*
  * equal - #defined in mystring.h

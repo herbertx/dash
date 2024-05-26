@@ -57,6 +57,7 @@ extern const char cqchars[];
 #define qchars (cqchars + 1)
 extern const char illnum[];
 extern const char homestr[];
+extern const char dotdir[];
 
 #if 0
 void scopyn(const char *, char *, int);

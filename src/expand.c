@@ -1358,7 +1358,7 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 	cp = expdir;
 	expdir_len = enddir - cp;
 	if (!expdir_len)
-		cp = ".";
+		cp = dotdir;
 	if ((dirp = opendir(cp)) == NULL)
 		return;
 	if (*endname == 0) {

@@ -126,7 +126,7 @@ dotdot:
 		}
 	}
 	if (!*dest)
-		dest = ".";
+		dest = dotdir;
 	path = bltinlookup("CDPATH");
 	while (p = path, (len = padvance_magic(&path, dest, 0)) >= 0) {
 		c = *p;
