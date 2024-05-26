@@ -81,6 +81,7 @@ int savestatus = -1;		/* exit status of last command outside traps */
 /* Prevent PS4 nesting. */
 MKINIT int inps4;
 
+MKINIT int tpip[2] = { -1 };
 
 #if !defined(__alpha__) || (defined(__GNUC__) && __GNUC__ >= 3)
 STATIC
@@ -127,6 +128,11 @@ EXITRESET {
 	evalskip = 0;
 	loopnest = 0;
 	inps4 = 0;
+
+	if (tpip[0] >= 0) {
+		close(tpip[0]);
+		close(tpip[1]);
+	}
 }
 #endif
 
@@ -624,8 +630,9 @@ evalpipe(union node *n, int flags)
 void
 evalbackcmd(union node *n, struct backcmd *result)
 {
-	int pip[2];
 	struct job *jp;
+	int pip[2];
+	int pid;
 
 	result->fd = -1;
 	result->buf = NULL;
@@ -636,8 +643,12 @@ evalbackcmd(union node *n, struct backcmd *result)
 	}
 
 	sh_pipe(pip, 0);
+	tpip[0] = pip[0];
+	tpip[1] = pip[1];
 	jp = makejob(1);
-	if (forkshell(jp, n, FORK_NOJOB) == 0) {
+	pid = forkshell(jp, n, FORK_NOJOB);
+	tpip[0] = -1;
+	if (pid == 0) {
 		FORCEINTON;
 		close(pip[0]);
 		if (pip[1] != 1) {
