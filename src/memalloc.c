@@ -43,18 +43,28 @@
 #include "mystring.h"
 #include "system.h"
 
+static __attribute__((__always_inline__)) inline void outofspace(void)
+{
+	sh_error("Out of space");
+}
+
+static void *checknull(void *p)
+{
+	if (!p)
+		outofspace();
+	return p;
+}
+
 /*
  * Like malloc, but returns an error when out of space.
  */
 
-void *ckmalloc(size_t nbytes)
+__attribute__((__noinline__)) void *ckmalloc(size_t nbytes)
 {
 	void *p;
 
 	p = malloc(nbytes);
-	if (p == NULL)
-		sh_error("Out of space");
-	return p;
+	return checknull(p);
 }
 
 
@@ -62,12 +72,10 @@ void *ckmalloc(size_t nbytes)
  * Same for realloc.
  */
 
-void *ckrealloc(void *p, size_t nbytes)
+__attribute__((__noinline__)) void *ckrealloc(void *p, size_t nbytes)
 {
 	p = realloc(p, nbytes);
-	if (p == NULL)
-		sh_error("Out of space");
-	return p;
+	return checknull(p);
 }
 
 
@@ -78,10 +86,7 @@ void *ckrealloc(void *p, size_t nbytes)
 char *
 savestr(const char *s)
 {
-	char *p = strdup(s);
-	if (!p)
-		sh_error("Out of space");
-	return p;
+	return checknull(strdup(s));
 }
 
 
@@ -124,7 +129,7 @@ void *stalloc(size_t nbytes)
 			blocksize = MINSIZE;
 		len = sizeof(struct stack_block) - MINSIZE + blocksize;
 		if (len < blocksize)
-			sh_error("Out of space");
+			outofspace();
 		INTOFF;
 		sp = ckmalloc(len);
 		sp->prev = stackp;
@@ -155,7 +160,8 @@ void stunalloc(void *p)
 
 
 
-void pushstackmark(struct stackmark *mark, size_t len)
+__attribute__((__noinline__)) void pushstackmark(struct stackmark *mark,
+						 size_t len)
 {
 	mark->stackp = stackp;
 	mark->stacknxt = stacknxt;
@@ -197,13 +203,14 @@ popstackmark(struct stackmark *mark)
  * part of the block that has been used.
  */
 
-static void growstackblock(size_t min)
+static char *growstackblock(size_t min)
 {
 	size_t newlen;
+	char *p;
 
 	newlen = stacknleft * 2;
 	if (newlen < stacknleft)
-		sh_error("Out of space");
+		outofspace();
 	min = SHELL_ALIGN(min | 128);
 	if (newlen < min)
 		newlen += min;
@@ -220,19 +227,22 @@ static void growstackblock(size_t min)
 		sp = ckrealloc(sp, grosslen);
 		sp->prev = prevstackp;
 		stackp = sp;
-		stacknxt = sp->space;
+		p = stacknxt = sp->space;
 		stacknleft = newlen;
 		sstrend = sp->space + newlen;
 		INTON;
 	} else {
 		char *oldspace = stacknxt;
 		int oldlen = stacknleft;
-		char *p = stalloc(newlen);
+
+		p = stalloc(newlen);
 
 		/* free the space we just allocated */
 		stacknxt = memcpy(p, oldspace, oldlen);
 		stacknleft += newlen;
 	}
+
+	return p;
 }
 
 /*
@@ -258,14 +268,13 @@ growstackstr(void)
 {
 	size_t len = stackblocksize();
 
-	growstackblock(0);
-	return stackblock() + len;
+	return growstackblock(0) + len;
 }
 
-char *growstackto(size_t len)
+__attribute__((__noinline__)) char *growstackto(size_t len)
 {
 	if (stackblocksize() < len)
-		growstackblock(len);
+		return growstackblock(len);
 	return stackblock();
 }
 
@@ -273,16 +282,14 @@ char *growstackto(size_t len)
  * Called from CHECKSTRSPACE.
  */
 
-char *
-makestrspace(size_t newlen, char *p)
+__attribute__((__noinline__)) char *makestrspace(size_t newlen, char *p)
 {
 	size_t len = p - stacknxt;
 
 	return growstackto(len + newlen) + len;
 }
 
-char *
-stnputs(const char *s, size_t n, char *p)
+__attribute__((__noinline__)) char *stnputs(const char *s, size_t n, char *p)
 {
 	p = makestrspace(n, p);
 	p = mempcpy(p, s, n);
