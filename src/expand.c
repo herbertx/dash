@@ -32,49 +32,50 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
+#include <ctype.h>
 #include <dirent.h>
-#include <unistd.h>
-#ifdef HAVE_GETPWNAM
-#include <pwd.h>
-#endif
-#include <stdlib.h>
-#include <stdio.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <string.h>
 #ifdef HAVE_FNMATCH
 #include <fnmatch.h>
 #endif
 #ifdef HAVE_GLOB
 #include <glob.h>
 #endif
-#include <ctype.h>
+#include <inttypes.h>
+#include <limits.h>
+#ifdef HAVE_GETPWNAM
+#include <pwd.h>
+#endif
+#include <setjmp.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /*
  * Routines to expand arguments to commands.  We have to deal with
  * backquotes, shell variables, and file metacharacters.
  */
 
-#include "shell.h"
-#include "main.h"
-#include "nodes.h"
+#include "error.h"
 #include "eval.h"
 #include "expand.h"
-#include "syntax.h"
-#include "parser.h"
 #include "jobs.h"
-#include "options.h"
-#include "var.h"
-#include "output.h"
+#include "main.h"
 #include "memalloc.h"
-#include "error.h"
 #include "mystring.h"
+#include "nodes.h"
+#include "options.h"
+#include "output.h"
+#include "parser.h"
+#include "shell.h"
 #include "show.h"
+#include "syntax.h"
 #include "system.h"
+#include "var.h"
 
 /*
  * _rmescape() flags
@@ -120,7 +121,7 @@ static size_t memtodest(const char *p, size_t len, int flags);
 STATIC ssize_t varvalue(char *, int, int, int);
 STATIC void expandmeta(struct strlist *);
 static void addglob(const glob64_t *);
-STATIC void expmeta(char *, unsigned, unsigned);
+static char *expmeta(char *, unsigned, size_t);
 STATIC struct strlist *expsort(struct strlist *);
 STATIC struct strlist *msort(struct strlist *, int);
 STATIC void addfname(char *);
@@ -1225,10 +1226,6 @@ static void addglob(const glob64_t *pglob)
 	} while (*++p);
 }
 
-STATIC char *expdir;
-STATIC unsigned expdir_max;
-
-
 STATIC void
 expandmeta(struct strlist *str)
 {
@@ -1255,11 +1252,8 @@ expandmeta(struct strlist *str)
 		INTOFF;
 		p = preglob(str->text, RMESCAPE_ALLOC | RMESCAPE_HEAP);
 		len = strlen(p);
-		expdir_max = len + PATH_MAX;
-		expdir = ckmalloc(expdir_max);
 
 		expmeta(p, len, 0);
-		ckfree(expdir);
 		if (p != str->text)
 			ckfree(p);
 		INTON;
@@ -1282,26 +1276,58 @@ nometa:
 	}
 }
 
+static void addfname_common(char *name)
+{
+	struct strlist *sp;
+
+	sp = (struct strlist *)stalloc(sizeof *sp);
+	sp->text = name;
+	*exparg.lastp = sp;
+	exparg.lastp = &sp->next;
+}
+
+static char *addfnamealt(char *enddir, size_t expdir_len)
+{
+	char *name;
+
+	name = grabstackstr(enddir);
+	addfname_common(name);
+
+	STARTSTACKSTR(enddir);
+	return stnputs(name, expdir_len, enddir) - expdir_len;
+}
 
 /*
  * Do metacharacter (i.e. *, ?, [...]) expansion.
  */
 
-STATIC void
-expmeta(char *name, unsigned name_len, unsigned expdir_len)
+static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 {
-	char *enddir = expdir + expdir_len;
-	char *p;
-	const char *cp;
-	char *start;
-	char *endname;
-	int metaflag;
+	struct jmploc *volatile savehandler;
+	struct jmploc jmploc;
 	struct stat64 statb;
-	DIR *dirp;
 	struct dirent64 *dp;
-	int atend;
+	volatile int err;
+	char *endname;
+	char *enddir;
+	int metaflag;
 	int matchdot;
+	char *start;
+	size_t len;
+	DIR *dirp;
+	int atend;
+	char *cp;
+	char *p;
 	int esc;
+
+	*(DIR *volatile *)&dirp = NULL;
+	savehandler = handler;
+	if (unlikely(err = setjmp(jmploc.loc)))
+		goto out;
+
+	len = expdir_len + name_len + 1;
+	cp = growstackto(len);
+	enddir = cp + expdir_len;
 
 	metaflag = 0;
 	start = name;
@@ -1334,16 +1360,16 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 	}
 	if (metaflag == 0) {	/* we've reached the end of the file name */
 		if (!expdir_len)
-			return;
+			goto out_opendir;
 		p = name;
 		do {
 			if (*p == '\\' && p[1])
 				p++;
 			*enddir++ = *p;
 		} while (*p++);
-		if (lstat64(expdir, &statb) >= 0)
-			addfname(expdir);
-		return;
+		if (lstat64(cp, &statb) >= 0)
+			cp = addfnamealt(enddir, expdir_len);
+		goto out_opendir;
 	}
 	endname = p;
 	if (name < start) {
@@ -1355,12 +1381,11 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 		} while (p < start);
 	}
 	*enddir = 0;
-	cp = expdir;
 	expdir_len = enddir - cp;
-	if (!expdir_len)
-		cp = dotdir;
-	if ((dirp = opendir(cp)) == NULL)
-		return;
+
+	*(DIR *volatile *)&dirp = opendir(expdir_len ? cp : dotdir);
+	if (!dirp)
+		goto out_opendir;
 	if (*endname == 0) {
 		atend = 1;
 	} else {
@@ -1379,32 +1404,29 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 		if (dp->d_name[0] == '.' && ! matchdot)
 			continue;
 		if (pmatch(start, dp->d_name)) {
-			if (atend) {
-				scopy(dp->d_name, enddir);
-				addfname(expdir);
-			} else {
-				unsigned offset;
-				unsigned len;
+			len = strlen(dp->d_name) + 1;
 
-				p = stpcpy(enddir, dp->d_name);
-				*p = '/';
-
-				offset = p - expdir + 1;
-				len = offset + name_len + NAME_MAX;
-				if (len > expdir_max) {
-					len += PATH_MAX;
-					expdir = ckrealloc(expdir, len);
-					expdir_max = len;
-				}
-
-				expmeta(endname, name_len, offset);
-				enddir = expdir + expdir_len;
+			enddir = cp + expdir_len;
+			enddir = stnputs(dp->d_name, len, enddir);
+			if (atend)
+				cp = addfnamealt(enddir, expdir_len);
+			else {
+				enddir[-1] = '/';
+				len += expdir_len;
+				cp = expmeta(endname, name_len, len);
 			}
 		}
 	}
-	closedir(dirp);
 	if (! atend)
 		endname[-esc - 1] = esc ? '\\' : '/';
+
+out:
+	closedir(*(DIR *volatile *)&dirp);
+out_opendir:
+	handler = savehandler;
+	if (err)
+		longjmp(handler->loc, 1);
+	return cp;
 }
 
 
@@ -1415,12 +1437,7 @@ expmeta(char *name, unsigned name_len, unsigned expdir_len)
 STATIC void
 addfname(char *name)
 {
-	struct strlist *sp;
-
-	sp = (struct strlist *)stalloc(sizeof *sp);
-	sp->text = sstrdup(name);
-	*exparg.lastp = sp;
-	exparg.lastp = &sp->next;
+	addfname_common(sstrdup(name));
 }
 
 
