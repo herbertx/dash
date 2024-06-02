@@ -143,7 +143,6 @@ STATIC void addfname(char *);
 STATIC int patmatch(char *, const char *);
 STATIC int pmatch(char *, const char *);
 static size_t cvtnum(intmax_t num, int flags);
-STATIC size_t esclen(const char *, const char *);
 STATIC void varunset(const char *, const char *, const char *, int)
 	__attribute__((__noreturn__));
 
@@ -166,14 +165,17 @@ preglob(const char *pattern, int flag) {
 }
 
 
-STATIC size_t
-esclen(const char *start, const char *p) {
+static size_t mesclen(const char *start, const char *p, char mesc) {
 	size_t esc = 0;
 
-	while (p > start && *--p == (char)CTLESC) {
+	while (p > start && *--p == mesc) {
 		esc++;
 	}
 	return esc;
+}
+
+static size_t esclen(const char *start, const char *p) {
+	return mesclen(start, p, CTLESC);
 }
 
 static __attribute__((noinline)) unsigned mbnext(const char *p)
@@ -1544,9 +1546,6 @@ static void addglob(const glob64_t *pglob)
 STATIC void
 expandmeta(struct strlist *str)
 {
-	static const char metachars[] = {
-		'*', '?', '[', 0
-	};
 	/* TODO - EXP_REDIR */
 
 	if (GLOB_IS_ENABLED)
@@ -1560,7 +1559,7 @@ expandmeta(struct strlist *str)
 
 		if (fflag)
 			goto nometa;
-		if (!strpbrk(str->text, metachars))
+		if (!strpbrk(str->text, "*?]"))
 			goto nometa;
 		savelastp = exparg.lastp;
 
@@ -1634,51 +1633,29 @@ static char *expmeta_rmescapes(char *enddir, const char *name)
 	return enddir - 1;
 }
 
-static int skipesc(char *p)
-{
-	unsigned short mb;
-	int esc = 0;
-
-	mb = mbnext(p);
-	if ((mb >> 8) > 3)
-		return (mb & 0xff) + (mb >> 8) - 1;
-
-	esc = mb & 0xff;
-
-	if (!esc && p[esc] == '\\' && p[esc + 1]) {
-		esc++;
-		mb = mbnext(p + esc);
-		esc += mb & 0xff;
-
-		if ((mb >> 8) > 3)
-			esc += (mb >> 8) - 1;
-	}
-
-	return esc;
-}
-
 /*
  * Do metacharacter (i.e. *, ?, [...]) expansion.
  */
 
 static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 {
+	const char mesc = FNMATCH_IS_ENABLED ? '\\' : CTLESC;
 	struct jmploc *volatile savehandler;
 	struct jmploc jmploc;
 	struct stat64 statb;
 	struct dirent64 *dp;
 	volatile int err;
 	char *endname;
+	char *zeroedp;
 	char *enddir;
-	int metaflag;
 	int matchdot;
+	unsigned esc;
 	char *start;
 	size_t len;
 	DIR *dirp;
 	char *pat;
 	char *cp;
 	char *p;
-	int esc;
 	int c;
 
 	*(DIR *volatile *)&dirp = NULL;
@@ -1690,32 +1667,16 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 	cp = growstackto(len);
 	enddir = cp + expdir_len;
 
-	metaflag = 0;
-	start = name;
-	for (p = name; esc = 0, *p; p += esc + 1) {
-		if (*p == '*' || *p == '?')
-			metaflag = 1;
-		else if (*p == '[') {
-			char *q = p + 1;
-			for (;;) {
-				q += skipesc(q);
-				if (*q == '/' || *q == '\0')
-					break;
-				if (*++q == ']') {
-					metaflag = 1;
-					break;
-				}
-			}
-		} else {
-			esc = skipesc(p);
-			if (p[esc] == '/') {
-				if (metaflag)
-					break;
-				start = p + esc + 1;
-			}
-		}
-	}
-	if (metaflag == 0) {	/* we've reached the end of the file name */
+	p = name;
+	esc = 0;
+	do {
+		p = strpbrk(p + esc, "*?]");
+		if (!p)
+			break;
+		esc = mesclen(name, p, mesc) & 1;
+	} while (esc);
+	/* No meta characters */
+	if (likely(!p)) {
 		if (!expdir_len)
 			goto out_opendir;
 		enddir = expmeta_rmescapes(enddir, name);
@@ -1723,37 +1684,44 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 			cp = addfnamealt(enddir, expdir_len);
 		goto out_opendir;
 	}
-	endname = p;
-	if (name < start) {
-		c = *start;
+	start = memrchr(name, '/', p - name);
+	if (start) {
+		c = *++start;
 		*start = 0;
 		enddir = expmeta_rmescapes(enddir, name);
 		*start = c;
-	}
+		expdir_len = enddir - cp;
+	} else
+		start = name;
 	*enddir = 0;
-	expdir_len = enddir - cp;
 
 	*(DIR *volatile *)&dirp = opendir(expdir_len ? cp : dotdir);
 	if (!dirp)
 		goto out_opendir;
-	c = *endname;
-	if (c) {
-		*endname = '\0';
-		endname += esc + 1;
+	esc = 0;
+	p = strchrnul(p + 1, '/');
+	zeroedp = p;
+	endname = p;
+	if (*p) {
+		esc = mesclen(name, p, mesc) & 1;
+		zeroedp -= esc;
+		endname++;
 	}
+	c = *zeroedp;
+	*zeroedp = '\0';
 	name_len -= endname - name;
 	matchdot = 0;
 	pat = start;
 	p = pat;
-	if (*p == (FNMATCH_IS_ENABLED ? '\\' : (char)CTLESC))
+	if (*p == mesc)
 		p++;
 	if (*p == '.')
 		matchdot++;
-	while (! int_pending() && (dp = readdir64(dirp)) != NULL) {
+	while ((dp = readdir64(dirp))) {
 		char *dname = dp->d_name;
 
 		if (*dname == '.' && !matchdot)
-			continue;
+			goto check_int;
 		len = strlen(dname) + 1;
 		p = dname;
 		if (!FNMATCH_IS_ENABLED) {
@@ -1774,9 +1742,11 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 			}
 			enddir = cp + expdir_len;
 		}
+check_int:
+		if (int_pending())
+			break;
 	}
-	if (c)
-		endname[-esc - 1] = c;
+	*zeroedp = c;
 
 out:
 	closedir(*(DIR *volatile *)&dirp);
