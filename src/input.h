@@ -35,6 +35,7 @@
  */
 
 #include <limits.h>
+#include <stdbool.h>
 
 #ifdef SMALL
 #define IS_DEFINED_SMALL 1
@@ -94,6 +95,7 @@ struct parsefile {
 };
 
 extern struct parsefile *parsefile;
+extern int stdin_istty;
 
 /*
  * The input line number.  Input.c just defines this variable, and saves
@@ -113,6 +115,8 @@ void pushstdin(void);
 void popfile(void);
 void unwindfiles(struct parsefile *);
 void popallfiles(void);
+void flush_input(void);
+void reset_input(void);
 
 static inline int input_get_lleft(struct parsefile *pf)
 {

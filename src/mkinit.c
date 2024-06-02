@@ -119,6 +119,11 @@ char forkreset[] = "\
  * This routine is called when we enter a subshell.\n\
  */\n";
 
+char postexitreset[] = "\
+/*\n\
+ * This routine is called in exitshell.\n\
+ */\n";
+
 char reset[] = "\
 /*\n\
  * This routine is called when an error or an interrupt occurs in an\n\
@@ -130,6 +135,7 @@ struct event event[] = {
 	{"INIT", "init", init},
 	{"EXITRESET", "exitreset", exitreset},
 	{"FORKRESET", "forkreset", forkreset, "union node *n"},
+	{"POSTEXITRESET", "postexitreset", postexitreset},
 	{"RESET", "reset", reset},
 	{NULL, NULL}
 };

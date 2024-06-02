@@ -39,4 +39,5 @@ union node;
 void init(void);
 void exitreset(void);
 void forkreset(union node *);
+void postexitreset(void);
 void reset(void);

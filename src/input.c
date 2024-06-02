@@ -32,11 +32,13 @@
  * SUCH DAMAGE.
  */
 
-#include <stdio.h>	/* defines BUFSIZ */
 #include <fcntl.h>
-#include <unistd.h>
+#include <stdbool.h>
+#include <stdio.h>	/* defines BUFSIZ */
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
+#include <unistd.h>
 
 /*
  * This file implements the input routines used by the parser.
@@ -59,12 +61,21 @@
 
 #define IBUFSIZ (BUFSIZ + PUNGETC_MAX + 1)
 
+struct stdin_state {
+	tcflag_t canon;
+	off_t seekable;
+	struct termios tios;
+};
 
 MKINIT struct parsefile basepf;	/* top level input file */
 MKINIT char basebuf[IBUFSIZ];	/* buffer for top level input file */
 MKINIT struct parsefile *toppf = &basepf;
+MKINIT struct stdin_state stdin_state;
 struct parsefile *parsefile = &basepf;	/* current input file */
 int whichprompt;		/* 1 == PS1, 2 == PS2 */
+int stdin_istty;
+
+MKINIT void input_init(void);
 
 STATIC void pushfile(void);
 static void popstring(void);
@@ -74,6 +85,7 @@ static int preadbuffer(void);
 
 #ifdef mkinit
 INCLUDE <stdio.h>
+INCLUDE <termios.h>
 INCLUDE <unistd.h>
 INCLUDE "input.h"
 INCLUDE "error.h"
@@ -82,6 +94,8 @@ INCLUDE "syntax.h"
 INIT {
 	basepf.nextc = basepf.buf = basebuf;
 	basepf.linno = 1;
+
+	input_init();
 }
 
 RESET {
@@ -104,8 +118,32 @@ FORKRESET {
 		parsefile->fd = 0;
 	}
 }
+
+POSTEXITRESET {
+	flush_input();
+}
 #endif
 
+void input_init(void)
+{
+	struct stdin_state *st = &stdin_state;
+	int istty;
+
+	istty = tcgetattr(0, &st->tios) + 1;
+	st->seekable = istty ? 0 : lseek(0, 0, SEEK_CUR) + 1;
+	st->canon = istty ? st->tios.c_lflag & ICANON : 0;
+	stdin_istty = istty;
+}
+
+static bool stdin_bufferable(void)
+{
+	struct stdin_state *st = &stdin_state;
+
+	if (stdin_istty < 0)
+		input_init();
+
+	return st->canon || st->seekable;
+}
 
 static void freestrings(struct strpush *sp)
 {
@@ -191,6 +229,7 @@ static int
 preadfd(void)
 {
 	char *buf = parsefile->buf;
+	int fd = parsefile->fd;
 	int unget;
 	int pnr;
 	int nr;
@@ -214,7 +253,7 @@ preadfd(void)
 retry:
 	nr = pnr;
 #ifndef SMALL
-	if (parsefile->fd == 0 && el) {
+	if (fd == 0 && el) {
 		static const char *rl_cp;
 		static int el_len;
 
@@ -237,38 +276,23 @@ retry:
 				rl_cp = 0;
 		}
 
-	} else
-#endif
-	if (parsefile->fd)
-		nr = read(parsefile->fd, buf, nr);
-	else {
-		nr = 0;
-
-		do {
-			int err;
-
-			err = read(0, buf, 1);
-			if (err <= 0) {
-				if (nr)
-					break;
-
-				nr = err;
-				if (errno != EWOULDBLOCK)
-					break;
-				if (stdin_clear_nonblock() < 0)
-					break;
-
-				out2str("sh: turning off NDELAY mode\n");
-				goto retry;
-			}
-
-			nr++;
-		} while (0);
+		return nr;
 	}
+#endif
+
+	if (!fd && !stdin_bufferable())
+		nr = 1;
+
+	nr = read(fd, buf, nr);
 
 	if (nr < 0) {
 		if (errno == EINTR && !(basepf.prev && pending_sig))
 			goto retry;
+		if (fd == 0 && errno == EWOULDBLOCK &&
+		    stdin_clear_nonblock() >= 0) {
+			out2str("sh: turning off NDELAY mode\n");
+			goto retry;
+		}
 	}
 	return nr;
 }
@@ -302,6 +326,8 @@ static int preadbuffer(void)
 	something = !first;
 
 	more = input_get_lleft(parsefile);
+
+	INTOFF;
 	if (more <= 0) {
 		int nr;
 
@@ -313,6 +339,7 @@ again:
 			input_set_lleft(parsefile, parsefile->nleft = 0);
 			if (!IS_DEFINED_SMALL && nr > 0)
 				goto save;
+			INTON;
 			return PEOF;
 		}
 	}
@@ -365,11 +392,10 @@ save:
 
 	if (parsefile->fd == 0 && hist && something) {
 		HistEvent he;
-		INTOFF;
 		history(hist, &he, first ? H_ENTER : H_APPEND,
 			parsefile->nextc);
-		INTON;
 	}
+	INTON;
 
 	if (vflag) {
 		out2str(parsefile->nextc);
@@ -589,4 +615,22 @@ void
 popallfiles(void)
 {
 	unwindfiles(toppf);
+}
+
+void __attribute__((noinline)) flush_input(void)
+{
+	int left = basepf.nleft + input_get_lleft(&basepf);
+
+	if (stdin_state.seekable && left) {
+		INTOFF;
+		lseek(0, -left, SEEK_CUR);
+		input_set_lleft(&basepf, basepf.nleft = 0);
+		INTON;
+	}
+}
+
+void reset_input(void)
+{
+	flush_input();
+	stdin_istty = -1;
 }

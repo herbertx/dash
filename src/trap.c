@@ -426,6 +426,7 @@ exitshell(void)
 	}
 out:
 	exitreset();
+	postexitreset();
 	/*
 	 * Disable job control so that whoever had the foreground before we
 	 * started can get it back.

@@ -907,6 +907,8 @@ bail:
 		goto bail;
 
 	default:
+		flush_input();
+
 		/* Fork off a child process if necessary. */
 		if (!(flags & EV_EXIT) || have_traps()) {
 			INTOFF;
@@ -1142,6 +1144,7 @@ execcmd(int argc, char **argv)
 		iflag = 0;		/* exit on error */
 		mflag = 0;
 		optschanged();
+		flush_input();
 		shellexec(argv + 1, pathval(), 0);
 	}
 	return 0;

@@ -969,6 +969,9 @@ forkshell(struct job *jp, union node *n, int mode)
 	int pid;
 
 	TRACE(("forkshell(%%%d, %p, %d) called\n", jobno(jp), n, mode));
+
+	flush_input();
+
 	pid = fork();
 	if (pid == 0)
 		forkchild(jp, n, mode);

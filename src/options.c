@@ -142,7 +142,7 @@ procargs(int argc, char **argv)
 			sh_error("-c requires an argument");
 		sflag = 1;
 	}
-	if (iflag == 2 && sflag == 1 && isatty(0) && isatty(1))
+	if (iflag == 2 && sflag == 1 && stdin_istty && isatty(1))
 		iflag = 1;
 	if (mflag == 2)
 		mflag = iflag;

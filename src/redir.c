@@ -46,16 +46,17 @@
  * Code for dealing with input/output redirection.
  */
 
-#include "main.h"
-#include "shell.h"
-#include "nodes.h"
-#include "jobs.h"
-#include "options.h"
-#include "expand.h"
-#include "redir.h"
-#include "output.h"
-#include "memalloc.h"
 #include "error.h"
+#include "expand.h"
+#include "input.h"
+#include "jobs.h"
+#include "main.h"
+#include "memalloc.h"
+#include "nodes.h"
+#include "options.h"
+#include "output.h"
+#include "redir.h"
+#include "shell.h"
 #include "system.h"
 #include "trap.h"
 
@@ -142,6 +143,8 @@ redirect(union node *redir, int flags)
 			continue;
 
 		fd = n->nfile.fd;
+		if (fd == 0)
+			reset_input();
 
 		if (sv) {
 			int closed;
@@ -415,8 +418,11 @@ popredir(int drop)
 				close(i);
 			break;
 		default:
-			if (!drop)
+			if (!drop) {
+				if (i == 0)
+					reset_input();
 				dup2(rp->renamed[i], i);
+			}
 			close(rp->renamed[i]);
 			break;
 		}
