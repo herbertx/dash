@@ -86,7 +86,7 @@ struct var varinit[] = {
 #if ATTY
 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"ATTY\0",	0 },
 #endif
-	{ 0,	VSTRFIXED|VTEXTFIXED,		defifsvar,	0 },
+	{ 0,	VSTRFIXED|VTEXTFIXED,		defifsvar,	changeifs },
 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"MAIL\0",	changemail },
 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"MAILPATH\0",	changemail },
 	{ 0,	VSTRFIXED|VTEXTFIXED,		defpathvar,	changepath },
@@ -267,9 +267,6 @@ struct var *setvareq(char *s, int flags)
 				 n);
 		}
 
-		if (vp->func && (flags & VNOFUNC) == 0)
-			(*vp->func)(varnull(s));
-
 		if ((vp->flags & (VTEXTFIXED|VSTACK)) == 0)
 			ckfree(vp->text);
 
@@ -300,6 +297,9 @@ out_free:
 		s = savestr(s);
 	vp->text = s;
 	vp->flags = flags;
+
+	if (vp->func && (flags & VNOFUNC) == 0)
+		(*vp->func)(varnull(s));
 
 out:
 	return vp;
@@ -531,12 +531,12 @@ poplocalvars(void)
 			vp->flags &= ~(VSTRFIXED|VREADONLY);
 			unsetvar(vp->text);
 		} else {
-			if (vp->func && !(vp->flags & VNOFUNC))
-				(*vp->func)(varnull(lvp->text));
 			if ((vp->flags & (VTEXTFIXED|VSTACK)) == 0)
 				ckfree(vp->text);
 			vp->flags = lvp->flags;
 			vp->text = lvp->text;
+			if (vp->func && !(vp->flags & VNOFUNC))
+				(*vp->func)(varnull(vp->text));
 		}
 		ckfree(lvp);
 	}

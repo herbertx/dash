@@ -75,6 +75,7 @@ void removerecordregions(int);
 void ifsbreakup(char *, int, struct arglist *);
 void ifsfree(void);
 void restore_handler_expandarg(struct jmploc *savehandler, int err);
+void changeifs(const char *);
 
 /* From arith.y */
 intmax_t arith(const char *);
