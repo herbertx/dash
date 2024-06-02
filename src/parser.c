@@ -883,7 +883,7 @@ static void synstack_pop(struct synstack **stack)
 	*stack = (*stack)->next;
 }
 
-static unsigned getmbc(int c, char *out, int mode)
+unsigned getmbc(int c, char *out, int mode)
 {
 	char *const start = out;
 	mbstate_t mbst = {};

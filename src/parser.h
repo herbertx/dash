@@ -95,6 +95,7 @@ const char *getprompt(void *);
 const char *const *findkwd(const char *);
 char *endofname(const char *);
 const char *expandstr(const char *);
+unsigned getmbc(int c, char *out, int mode);
 
 static inline int
 goodname(const char *p)

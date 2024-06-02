@@ -36,15 +36,16 @@
  * Miscelaneous builtins.
  */
 
+#include <ctype.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <stdlib.h>
 #include <sys/types.h>		/* quad_t */
 #include <sys/param.h>		/* BSD4_4 */
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <inttypes.h>
 
 #include "error.h"
 #include "expand.h"
@@ -151,8 +152,10 @@ readcmd(int argc, char **argv)
 	goto start;
 
 	for (;;) {
+		unsigned ml;
 		int c;
 
+		CHECKSTRSPACE((MB_LEN_MAX > 16 ? MB_LEN_MAX : 16) + 4, p);
 		c = pgetc();
 		if (c == PEOF) {
 			status = 1;
@@ -160,9 +163,14 @@ readcmd(int argc, char **argv)
 		}
 		if (c == '\0')
 			continue;
+		ml = getmbc(c, p, 0);
+		if (ml) {
+			p += ml;
+			goto record;
+		}
 		if (newloc >= startloc) {
 			if (c == '\n')
-				goto resetbs;
+				goto record;
 			goto put;
 		}
 		if (!rflag && c == '\\') {
@@ -172,13 +180,12 @@ readcmd(int argc, char **argv)
 		if (c == '\n')
 			break;
 put:
-		CHECKSTRSPACE(2, p);
 		if (strchr(qchars, c))
 			USTPUTC(CTLESC, p);
 		USTPUTC(c, p);
 
+record:
 		if (newloc >= startloc) {
-resetbs:
 			recordregion(startloc, newloc, 0);
 start:
 			startloc = p - (char *)stackblock();
