@@ -42,19 +42,20 @@
  * This file implements the input routines used by the parser.
  */
 
-#include "eval.h"
-#include "shell.h"
-#include "redir.h"
-#include "syntax.h"
-#include "input.h"
-#include "output.h"
-#include "options.h"
-#include "memalloc.h"
-#include "error.h"
 #include "alias.h"
-#include "parser.h"
+#include "error.h"
+#include "eval.h"
+#include "input.h"
 #include "main.h"
+#include "memalloc.h"
 #include "myhistedit.h"
+#include "options.h"
+#include "output.h"
+#include "parser.h"
+#include "redir.h"
+#include "shell.h"
+#include "syntax.h"
+#include "trap.h"
 
 #define IBUFSIZ (BUFSIZ + PUNGETC_MAX + 1)
 
@@ -258,7 +259,7 @@ retry:
 	}
 
 	if (nr < 0) {
-		if (errno == EINTR)
+		if (errno == EINTR && !(basepf.prev && pending_sig))
 			goto retry;
 	}
 	return nr;
@@ -522,6 +523,13 @@ pushfile(void)
 	parsefile = pf;
 }
 
+void pushstdin(void)
+{
+	INTOFF;
+	basepf.prev = parsefile;
+	parsefile = &basepf;
+	INTON;
+}
 
 void
 popfile(void)
@@ -529,6 +537,11 @@ popfile(void)
 	struct parsefile *pf = parsefile;
 
 	INTOFF;
+	parsefile = pf->prev;
+	pf->prev = NULL;
+	if (pf == &basepf)
+		goto out;
+
 	if (pf->fd >= 0)
 		close(pf->fd);
 	if (pf->buf)
@@ -539,15 +552,16 @@ popfile(void)
 		popstring();
 		freestrings(parsefile->spfree);
 	}
-	parsefile = pf->prev;
 	ckfree(pf);
+
+out:
 	INTON;
 }
 
 
-void unwindfiles(struct parsefile *stop)
+void __attribute__((noinline)) unwindfiles(struct parsefile *stop)
 {
-	while (parsefile != stop)
+	while (basepf.prev || parsefile != stop)
 		popfile();
 }
 

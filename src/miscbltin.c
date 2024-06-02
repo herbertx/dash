@@ -46,18 +46,20 @@
 #include <ctype.h>
 #include <inttypes.h>
 
-#include "shell.h"
-#include "options.h"
-#include "var.h"
-#include "output.h"
-#include "memalloc.h"
 #include "error.h"
+#include "expand.h"
+#include "input.h"
+#include "memalloc.h"
 #include "miscbltin.h"
 #include "mystring.h"
 #include "main.h"
-#include "expand.h"
+#include "options.h"
+#include "output.h"
 #include "parser.h"
+#include "shell.h"
+#include "syntax.h"
 #include "trap.h"
+#include "var.h"
 
 #undef rflag
 
@@ -115,14 +117,13 @@ readcmd_handle_line(char *s, int ac, char **ap)
 int
 readcmd(int argc, char **argv)
 {
-	char **ap;
-	char c;
-	int rflag;
 	char *prompt;
-	char *p;
 	int startloc;
 	int newloc;
 	int status;
+	char **ap;
+	int rflag;
+	char *p;
 	int i;
 
 	rflag = 0;
@@ -145,19 +146,17 @@ readcmd(int argc, char **argv)
 	status = 0;
 	STARTSTACKSTR(p);
 
+	pushstdin();
+
 	goto start;
 
 	for (;;) {
-		switch (read(0, &c, 1)) {
-		case 1:
-			break;
-		default:
-			if (errno == EINTR && !pending_sig)
-				continue;
-				/* fall through */
-		case 0:
+		int c;
+
+		c = pgetc();
+		if (c == PEOF) {
 			status = 1;
-			goto out;
+			break;
 		}
 		if (c == '\0')
 			continue;
@@ -186,7 +185,7 @@ start:
 			newloc = startloc - 1;
 		}
 	}
-out:
+	popfile();
 	recordregion(startloc, p - (char *)stackblock(), 0);
 	STACKSTRNUL(p);
 	readcmd_handle_line(p + 1, argc - (ap - argv), ap);

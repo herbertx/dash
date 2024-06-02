@@ -109,6 +109,7 @@ void pungetn(int);
 void pushstring(char *, void *);
 int setinputfile(const char *, int);
 void setinputstring(char *);
+void pushstdin(void);
 void popfile(void);
 void unwindfiles(struct parsefile *);
 void popallfiles(void);
