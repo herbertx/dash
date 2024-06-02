@@ -61,6 +61,7 @@
 
 MKINIT struct parsefile basepf;	/* top level input file */
 MKINIT char basebuf[IBUFSIZ];	/* buffer for top level input file */
+MKINIT struct parsefile *toppf = &basepf;
 struct parsefile *parsefile = &basepf;	/* current input file */
 int whichprompt;		/* 1 == PS1, 2 == PS2 */
 
@@ -89,8 +90,8 @@ RESET {
 	popallfiles();
 
 	c = PEOF;
-	if (basepf.nextc - basebuf > basepf.unget)
-		c = basepf.nextc[-basepf.unget - 1];
+	if (toppf->nextc - toppf->buf > toppf->unget)
+		c = toppf->nextc[-toppf->unget - 1];
 	while (c != '\n' && c != PEOF && !int_pending())
 		c = pgetc();
 }
@@ -473,13 +474,11 @@ out:
 static void
 setinputfd(int fd, int push)
 {
-	if (push) {
-		pushfile();
-		parsefile->buf = 0;
-	}
+	pushfile();
+	if (!push)
+		toppf = parsefile;
 	parsefile->fd = fd;
-	if (parsefile->buf == NULL)
-		parsefile->nextc = parsefile->buf = ckmalloc(IBUFSIZ);
+	parsefile->nextc = parsefile->buf = ckmalloc(IBUFSIZ);
 	input_set_lleft(parsefile, parsefile->nleft = 0);
 	plinno = 1;
 }
@@ -560,5 +559,5 @@ void unwindfiles(struct parsefile *stop)
 void
 popallfiles(void)
 {
-	unwindfiles(&basepf);
+	unwindfiles(toppf);
 }
