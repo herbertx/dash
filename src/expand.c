@@ -85,6 +85,7 @@
 #define RMESCAPE_GLOB	0x2	/* Add backslashes for glob */
 #define RMESCAPE_GROW	0x8	/* Grow strings instead of stalloc */
 #define RMESCAPE_HEAP	0x10	/* Malloc strings instead of stalloc */
+#define RMESCAPE_EMETA	0x20	/* Remove backslashes too */
 
 /* Add CTLESC when necessary. */
 #define QUOTES_ESC	(EXP_FULL | EXP_CASE)
@@ -1386,12 +1387,10 @@ expandmeta(struct strlist *str)
 		savelastp = exparg.lastp;
 
 		INTOFF;
-		p = preglob(str->text, RMESCAPE_ALLOC | RMESCAPE_HEAP);
+		p = str->text;
 		len = strlen(p);
 
 		expmeta(p, len, 0);
-		if (p != str->text)
-			ckfree(p);
 		INTON;
 		if (exparg.lastp == savelastp) {
 			/*
@@ -1433,6 +1432,41 @@ static char *addfnamealt(char *enddir, size_t expdir_len)
 	return stnputs(name, expdir_len, enddir) - expdir_len;
 }
 
+static void expmeta_rmescapes(char *enddir, char *name)
+{
+	preglob(strcpy(enddir, name), RMESCAPE_EMETA);
+}
+
+static unsigned mbcharlen(char *p)
+{
+	int esc = 0;
+
+	if (*++p == (char)CTLESC)
+		esc++;
+
+	return esc + 3 + (unsigned char)p[esc];
+}
+
+static size_t skipesc(char *p)
+{
+	size_t esc = 0;
+
+	if (p[esc] == (char)CTLMBCHAR)
+		esc += mbcharlen(p);
+	else if (p[esc] == (char)CTLESC)
+		esc++;
+	else if (p[esc] == '\\' && p[esc + 1]) {
+		while (p[++esc] == (char)CTLQUOTEMARK)
+			;
+		if (p[esc] == (char)CTLMBCHAR)
+			esc += mbcharlen(p + esc);
+		else if (p[esc] == (char)CTLESC)
+			esc++;
+	}
+
+	return esc;
+}
+
 /*
  * Do metacharacter (i.e. *, ?, [...]) expansion.
  */
@@ -1451,12 +1485,14 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 	char *start;
 	size_t len;
 	DIR *dirp;
-	int atend;
+	char *pat;
 	char *cp;
 	char *p;
 	int esc;
+	int c;
 
 	*(DIR *volatile *)&dirp = NULL;
+	*(char *volatile *)&pat = NULL;
 	savehandler = handler;
 	if (unlikely(err = setjmp(jmploc.loc)))
 		goto out;
@@ -1472,11 +1508,8 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 			metaflag = 1;
 		else if (*p == '[') {
 			char *q = p + 1;
-			if (*q == '!')
-				q++;
 			for (;;) {
-				if (*q == '\\')
-					q++;
+				q += skipesc(q);
 				if (*q == '/' || *q == '\0')
 					break;
 				if (*++q == ']') {
@@ -1485,8 +1518,7 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 				}
 			}
 		} else {
-			if (*p == '\\' && p[1])
-				esc++;
+			esc = skipesc(p);
 			if (p[esc] == '/') {
 				if (metaflag)
 					break;
@@ -1497,24 +1529,18 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 	if (metaflag == 0) {	/* we've reached the end of the file name */
 		if (!expdir_len)
 			goto out_opendir;
-		p = name;
-		do {
-			if (*p == '\\' && p[1])
-				p++;
-			*enddir++ = *p;
-		} while (*p++);
+		expmeta_rmescapes(enddir, name);
 		if (lstat64(cp, &statb) >= 0)
-			cp = addfnamealt(enddir, expdir_len);
+			cp = addfnamealt(strchrnul(enddir, 0), expdir_len);
 		goto out_opendir;
 	}
 	endname = p;
 	if (name < start) {
-		p = name;
-		do {
-			if (*p == '\\' && p[1])
-				p++;
-			*enddir++ = *p++;
-		} while (p < start);
+		c = *start;
+		*start = 0;
+		expmeta_rmescapes(enddir, name);
+		*start = c;
+		enddir += strlen(enddir);
 	}
 	*enddir = 0;
 	expdir_len = enddir - cp;
@@ -1522,16 +1548,16 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 	*(DIR *volatile *)&dirp = opendir(expdir_len ? cp : dotdir);
 	if (!dirp)
 		goto out_opendir;
-	if (*endname == 0) {
-		atend = 1;
-	} else {
-		atend = 0;
+	c = *endname;
+	if (c) {
 		*endname = '\0';
 		endname += esc + 1;
 	}
 	name_len -= endname - name;
 	matchdot = 0;
-	p = start;
+	*(char *volatile *)&pat =
+		preglob(start, RMESCAPE_ALLOC | RMESCAPE_HEAP);
+	p = pat;
 	if (*p == '\\')
 		p++;
 	if (*p == '.')
@@ -1539,12 +1565,12 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 	while (! int_pending() && (dp = readdir64(dirp)) != NULL) {
 		if (dp->d_name[0] == '.' && ! matchdot)
 			continue;
-		if (pmatch(start, dp->d_name)) {
+		if (pmatch(pat, dp->d_name)) {
 			len = strlen(dp->d_name) + 1;
 
 			enddir = cp + expdir_len;
 			enddir = stnputs(dp->d_name, len, enddir);
-			if (atend)
+			if (!c)
 				cp = addfnamealt(enddir, expdir_len);
 			else {
 				enddir[-1] = '/';
@@ -1553,10 +1579,13 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 			}
 		}
 	}
-	if (! atend)
-		endname[-esc - 1] = esc ? '\\' : '/';
+	if (c)
+		endname[-esc - 1] = c;
 
 out:
+	pat = *(char *volatile *)&pat;
+	if (pat != start)
+		ckfree(pat);
 	closedir(*(DIR *volatile *)&dirp);
 out_opendir:
 	handler = savehandler;
@@ -1800,6 +1829,7 @@ _rmescapes(char *str, int flag)
 	int notescaped;
 	int globbing;
 	int inquotes;
+	int expmeta;
 
 	p = strpbrk(str, cqchars);
 	if (!p) {
@@ -1808,6 +1838,7 @@ _rmescapes(char *str, int flag)
 	q = p;
 	r = str;
 	globbing = flag & RMESCAPE_GLOB;
+	expmeta = (flag & RMESCAPE_EMETA) ? RMESCAPE_GLOB : 0;
 
 	if (flag & RMESCAPE_ALLOC) {
 		size_t len = p - str;
@@ -1847,6 +1878,12 @@ _rmescapes(char *str, int flag)
 		} else if (*p == '\\') {
 			/* naked back slash */
 			newnesc ^= notescaped;
+			/* naked backslashes can only occur outside quotes */
+			inquotes = 0;
+			if (expmeta & ~newnesc) {
+				p++;
+				goto setnesc;
+			}
 		} else if (*p == (char)CTLMBCHAR) {
 			if (*++p == (char)CTLESC)
 				p++;
@@ -1857,7 +1894,9 @@ _rmescapes(char *str, int flag)
 			goto setnesc;
 		} else if (*p == (char)CTLESC) {
 			p++;
-			if (notescaped)
+			if (expmeta)
+				;
+			else if (notescaped)
 				*q++ = '\\';
 			else if (inquotes) {
 				*q++ = '\\';
