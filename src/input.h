@@ -34,11 +34,15 @@
  *	@(#)input.h	8.2 (Berkeley) 5/4/95
  */
 
+#include <limits.h>
+
 #ifdef SMALL
 #define IS_DEFINED_SMALL 1
 #else
 #define IS_DEFINED_SMALL 0
 #endif
+
+#define PUNGETC_MAX (MB_LEN_MAX > 16 ? MB_LEN_MAX : 16)
 
 /* PEOF (the end of file marker) is defined in syntax.h */
 
@@ -58,9 +62,6 @@ struct strpush {
 
 	/* Delay freeing so we can stop nested aliases. */
 	struct strpush *spfree;
-
-	/* Remember last two characters for pungetc. */
-	int lastc[2];
 
 	/* Number of outstanding calls to pungetc. */
 	int unget;
@@ -87,9 +88,6 @@ struct parsefile {
 	/* Delay freeing so we can stop nested aliases. */
 	struct strpush *spfree;
 
-	/* Remember last two characters for pungetc. */
-	int lastc[2];
-
 	/* Number of outstanding calls to pungetc. */
 	int unget;
 };
@@ -106,6 +104,7 @@ extern struct parsefile *parsefile;
 int pgetc(void);
 int pgetc2(void);
 void pungetc(void);
+void pungetn(int);
 void pushstring(char *, void *);
 int setinputfile(const char *, int);
 void setinputstring(char *);

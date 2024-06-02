@@ -56,7 +56,7 @@
 #include "main.h"
 #include "myhistedit.h"
 
-#define IBUFSIZ (BUFSIZ + 1)
+#define IBUFSIZ (BUFSIZ + PUNGETC_MAX + 1)
 
 
 MKINIT struct parsefile basepf;	/* top level input file */
@@ -83,13 +83,16 @@ INIT {
 }
 
 RESET {
+	int c;
+
 	/* clear input buffer */
 	popallfiles();
-	basepf.unget = 0;
-	while (basepf.lastc[0] != '\n' &&
-	       basepf.lastc[0] != PEOF &&
-	       !int_pending())
-		pgetc();
+
+	c = PEOF;
+	if (basepf.nextc - basebuf > basepf.unget)
+		c = basepf.nextc[-basepf.unget - 1];
+	while (c != '\n' && c != PEOF && !int_pending())
+		c = pgetc();
 }
 
 FORKRESET {
@@ -131,16 +134,19 @@ static int __pgetc(void)
 {
 	int c;
 
-	if (parsefile->unget)
-		return parsefile->lastc[--parsefile->unget];
+	if (parsefile->unget) {
+		long unget = -(long)(unsigned)parsefile->unget--;
+
+		if (parsefile->nleft < 0)
+			return preadbuffer();
+
+		return parsefile->nextc[unget];
+	}
 
 	if (--parsefile->nleft >= 0)
 		c = (signed char)*parsefile->nextc++;
 	else
 		c = preadbuffer();
-
-	parsefile->lastc[1] = parsefile->lastc[0];
-	parsefile->lastc[0] = c;
 
 	return c;
 }
@@ -176,9 +182,16 @@ static int stdin_clear_nonblock(void)
 static int
 preadfd(void)
 {
+	char *buf = parsefile->buf;
+	int unget;
 	int nr;
-	char *buf =  parsefile->buf;
-	parsefile->nextc = buf;
+
+	unget = parsefile->nextc - buf;
+	if (unget > PUNGETC_MAX)
+		unget = PUNGETC_MAX;
+
+	memmove(buf, parsefile->nextc - unget, unget);
+	parsefile->nextc = buf += unget;
 
 retry:
 #ifndef SMALL
@@ -196,8 +209,8 @@ retry:
 			nr = 0;
 		else {
 			nr = el_len;
-			if (nr > IBUFSIZ - 1)
-				nr = IBUFSIZ - 1;
+			if (nr > BUFSIZ)
+				nr = BUFSIZ;
 			memcpy(buf, rl_cp, nr);
 			if (nr != el_len) {
 				el_len -= nr;
@@ -209,9 +222,9 @@ retry:
 	} else
 #endif
 	if (parsefile->fd)
-		nr = read(parsefile->fd, buf, IBUFSIZ - 1);
+		nr = read(parsefile->fd, buf, BUFSIZ);
 	else {
-		unsigned len = IBUFSIZ - 1;
+		unsigned len = BUFSIZ;
 
 		nr = 0;
 
@@ -348,6 +361,11 @@ done:
 	return (signed char)*parsefile->nextc++;
 }
 
+void pungetn(int n)
+{
+	parsefile->unget += n;
+}
+
 /*
  * Undo a call to pgetc.  Only two characters may be pushed back.
  * PEOF may be pushed back.
@@ -356,7 +374,7 @@ done:
 void
 pungetc(void)
 {
-	parsefile->unget++;
+	pungetn(1);
 }
 
 /*
@@ -383,7 +401,6 @@ pushstring(char *s, void *ap)
 	sp->prevnleft = parsefile->nleft;
 	sp->unget = parsefile->unget;
 	sp->spfree = parsefile->spfree;
-	memcpy(sp->lastc, parsefile->lastc, sizeof(sp->lastc));
 	sp->ap = (struct alias *)ap;
 	if (ap) {
 		((struct alias *)ap)->flag |= ALIASINUSE;
@@ -413,7 +430,6 @@ static void popstring(void)
 	parsefile->nextc = sp->prevstring;
 	parsefile->nleft = sp->prevnleft;
 	parsefile->unget = sp->unget;
-	memcpy(parsefile->lastc, sp->lastc, sizeof(sp->lastc));
 /*dprintf("*** calling popstring: restoring to '%s'\n", parsenextc);*/
 	parsefile->strpush = sp->prev;
 	parsefile->spfree = sp;
@@ -457,7 +473,7 @@ setinputfd(int fd, int push)
 	}
 	parsefile->fd = fd;
 	if (parsefile->buf == NULL)
-		parsefile->buf = ckmalloc(IBUFSIZ);
+		parsefile->nextc = parsefile->buf = ckmalloc(IBUFSIZ);
 	input_set_lleft(parsefile, parsefile->nleft = 0);
 	plinno = 1;
 }
