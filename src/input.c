@@ -192,16 +192,27 @@ preadfd(void)
 {
 	char *buf = parsefile->buf;
 	int unget;
+	int pnr;
 	int nr;
+
+	nr = input_get_lleft(parsefile);
 
 	unget = parsefile->nextc - buf;
 	if (unget > PUNGETC_MAX)
 		unget = PUNGETC_MAX;
 
-	memmove(buf, parsefile->nextc - unget, unget);
-	parsefile->nextc = buf += unget;
+	memmove(buf, parsefile->nextc - unget, unget + nr);
+	buf += unget;
+	parsefile->nextc = buf;
+	buf += nr;
 
+	nr = BUFSIZ - nr;
+	if (!IS_DEFINED_SMALL && !nr)
+		return nr;
+
+	pnr = nr;
 retry:
+	nr = pnr;
 #ifndef SMALL
 	if (parsefile->fd == 0 && el) {
 		static const char *rl_cp;
@@ -216,9 +227,8 @@ retry:
 		if (rl_cp == NULL)
 			nr = 0;
 		else {
-			nr = el_len;
-			if (nr > BUFSIZ)
-				nr = BUFSIZ;
+			if (nr > el_len)
+				nr = el_len;
 			memcpy(buf, rl_cp, nr);
 			if (nr != el_len) {
 				el_len -= nr;
@@ -230,10 +240,8 @@ retry:
 	} else
 #endif
 	if (parsefile->fd)
-		nr = read(parsefile->fd, buf, BUFSIZ);
+		nr = read(parsefile->fd, buf, nr);
 	else {
-		unsigned len = BUFSIZ;
-
 		nr = 0;
 
 		do {
@@ -255,7 +263,7 @@ retry:
 			}
 
 			nr++;
-		} while (!IS_DEFINED_SMALL && *buf++ != '\n' && --len);
+		} while (0);
 	}
 
 	if (nr < 0) {
@@ -290,19 +298,26 @@ static int preadbuffer(void)
 		return PEOF;
 	flushall();
 
+	q = parsefile->nextc;
+	something = !first;
+
 	more = input_get_lleft(parsefile);
 	if (more <= 0) {
+		int nr;
+
 again:
-		if ((more = preadfd()) <= 0) {
+		nr = q - parsefile->nextc;
+		more = preadfd();
+		q = parsefile->nextc + nr;
+		if (more <= 0) {
 			input_set_lleft(parsefile, parsefile->nleft = 0);
+			if (!IS_DEFINED_SMALL && nr > 0)
+				goto save;
 			return PEOF;
 		}
 	}
 
-	q = parsefile->nextc;
-
 	/* delete nul characters */
-	something = !first;
 	for (;;) {
 		int c;
 
@@ -321,7 +336,6 @@ again:
 
 		switch (c) {
 		case '\n':
-			parsefile->nleft = q - parsefile->nextc - 1;
 			goto done;
 
 		default:
@@ -335,8 +349,7 @@ again:
 
 check:
 		if (more <= 0) {
-			parsefile->nleft = q - parsefile->nextc - 1;
-			if (parsefile->nleft < 0)
+			if (!IS_DEFINED_SMALL)
 				goto again;
 			break;
 		}
@@ -344,6 +357,8 @@ check:
 done:
 	input_set_lleft(parsefile, more);
 
+save:
+	parsefile->nleft = q - parsefile->nextc - 1;
 	if (!IS_DEFINED_SMALL)
 		savec = *q;
 	*q = '\0';
