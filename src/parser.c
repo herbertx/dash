@@ -36,7 +36,11 @@
 #include <alloca.h>
 #endif
 
+#include <limits.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <wchar.h>
+#include <wctype.h>
 
 #include "shell.h"
 #include "parser.h"
@@ -801,6 +805,8 @@ xxreadtoken(void)
 		setprompt(2);
 	}
 	for (;;) {	/* until token or start of word found */
+		int tok;
+
 		c = pgetc_eatbnl();
 		switch (c) {
 		case ' ': case '\t':
@@ -834,9 +840,10 @@ xxreadtoken(void)
 		case ')':
 			RETURN(TRP);
 		}
-		break;
+		tok = readtoken1(c, BASESYNTAX, (char *)NULL, 0);
+		if (tok != TBLANK)
+			return tok;
 	}
-	return readtoken1(c, BASESYNTAX, (char *)NULL, 0);
 #undef RETURN
 }
 
@@ -876,7 +883,53 @@ static void synstack_pop(struct synstack **stack)
 	*stack = (*stack)->next;
 }
 
+static unsigned getmbc(int c, char *out, int mode)
+{
+	char *const start = out;
+	mbstate_t mbst = {};
+	unsigned ml = 0;
+	size_t ml2;
+	wchar_t wc;
+	char *mbc;
 
+	if (likely(c >= 0))
+		return 0;
+
+	mbc = (mode & 3) < 2 ? out + 2 + (mode == 1) : out;
+	mbc[ml] = c;
+	while ((ml2 = mbrtowc(&wc, mbc + ml++, 1, &mbst)) == -2) {
+		if (ml >= MB_LEN_MAX)
+			break;
+		c = pgetc_eoa();
+		if (c == PEOA || c == PEOF)
+			break;
+		mbc[ml] = c;
+	}
+
+	if (ml2 == 1 && ml > 1) {
+		if (mode == 4 && iswblank(wc))
+			return 1;
+
+		if ((mode & 3) < 2) {
+			USTPUTC(CTLMBCHAR, out);
+			if (mode == 1)
+				USTPUTC(CTLESC, out);
+			USTPUTC(ml, out);
+		}
+		STADJUST(ml, out);
+		if ((mode & 3) < 2) {
+			USTPUTC(ml, out);
+			USTPUTC(CTLMBCHAR, out);
+		}
+
+		return out - start;
+	}
+
+	if (ml > 1)
+		pungetn(ml - 1);
+
+	return 0;
+}
 
 /*
  * If eofmark is NULL, read a word or a redirection symbol.  If eofmark
@@ -929,12 +982,29 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 		}
 #endif
 		CHECKEND();	/* set c to PEOF if at end of here document */
-		for (;;) {	/* until end of line or end of word */
-			CHECKSTRSPACE(4, out);	/* permit 4 calls to USTPUTC */
+		/* Until end of line or end of word */
+		for (;; c = pgetc_top(synstack)) {
+			int fieldsplitting;
+			unsigned ml;
+
+			/* Permit max(MB_LEN_MAX, 23) calls to USTPUTC. */
+			CHECKSTRSPACE((MB_LEN_MAX > 16 ? MB_LEN_MAX : 16) + 7,
+				      out);
+			fieldsplitting = synstack->syntax == BASESYNTAX &&
+					 !synstack->varnest ? 4 : 0;
+			ml = getmbc(c, out, fieldsplitting);
+			if (ml == 1) {
+				if (out == stackblock())
+					return TBLANK;
+				c = pgetc();
+				break;
+			}
+			out += ml;
+			if (ml)
+				continue;
 			switch(synstack->syntax[c]) {
 			case CNL:	/* '\n' */
-				if (synstack->syntax == BASESYNTAX &&
-				    !synstack->varnest)
+				if (fieldsplitting)
 					goto endword;	/* exit outer loop */
 				USTPUTC(c, out);
 				nlprompt();
@@ -956,26 +1026,33 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 					USTPUTC(CTLESC, out);
 					USTPUTC('\\', out);
 					pungetc();
-				} else {
-					if (
-						synstack->dblquote &&
-						c != '\\' && c != '`' &&
-						c != '$' && (
-							c != '"' ||
-							(eofmark != NULL &&
-							 !synstack->varnest)
-						) && (
-							c != '}' ||
-							!synstack->varnest
-						)
-					) {
-						USTPUTC(CTLESC, out);
-						USTPUTC('\\', out);
-					}
-					USTPUTC(CTLESC, out);
-					USTPUTC(c, out);
-					quotef++;
+					break;
 				}
+
+				if (
+					synstack->dblquote &&
+					c != '\\' && c != '`' &&
+					c != '$' && (
+						c != '"' ||
+						(eofmark != NULL &&
+						 !synstack->varnest)
+					) && (
+						c != '}' ||
+						!synstack->varnest
+					)
+				) {
+					USTPUTC(CTLESC, out);
+					USTPUTC('\\', out);
+				}
+				quotef++;
+
+				ml = getmbc(c, out, 1);
+				out += ml;
+				if (ml)
+					break;
+
+				USTPUTC(CTLESC, out);
+				USTPUTC(c, out);
 				break;
 			case CSQUOTE:
 				synstack->syntax = SQSYNTAX;
@@ -1053,11 +1130,10 @@ toggledq:
 			case CEOF:
 				goto endword;		/* exit outer loop */
 			default:
-				if (synstack->varnest == 0)
+				if (fieldsplitting)
 					goto endword;	/* exit outer loop */
 				USTPUTC(c, out);
 			}
-			c = pgetc_top(synstack);
 		}
 	}
 endword:
@@ -1384,6 +1460,7 @@ parsebackq: {
 	size_t psavelen;
 	size_t savelen;
 	union node *n;
+	unsigned ml;
 	char *pstr;
 	char *str;
 
@@ -1415,6 +1492,11 @@ parsebackq: {
                                 if (pc != '\\' && pc != '`' && pc != '$'
                                     && (!synstack->dblquote || pc != '"'))
                                         STPUTC('\\', pout);
+				CHECKSTRSPACE(MB_LEN_MAX, pout);
+				ml = getmbc(pc, pout, 2);
+				pout += ml;
+				if (ml)
+					continue;
 				break;
 
 			case PEOF:

@@ -276,6 +276,7 @@ static char *argstr(char *p, int flag)
 		CTLESC,
 		CTLVAR,
 		CTLBACKQ,
+		CTLMBCHAR,
 		CTLARI,
 		CTLENDARI,
 		0
@@ -300,6 +301,8 @@ tilde:
 start:
 	startloc = expdest - (char *)stackblock();
 	for (;;) {
+		unsigned ml;
+		unsigned mb;
 		int end;
 
 		length += strcspn(p + length, reject);
@@ -361,6 +364,22 @@ addquote:
 				length++;
 				startloc++;
 			}
+			break;
+		case CTLMBCHAR:
+			c = (signed char)*p--;
+			mb = mbnext(p);
+			ml = (mb >> 8) - 2;
+			if (flag & QUOTES_ESC) {
+				length = (mb >> 8) + (mb & 0xff);
+				if (c == (char)CTLESC)
+					startloc += length;
+				break;
+			}
+			if (c == CTLESC)
+				startloc += ml;
+			p += mb & 0xff;
+			expdest = stnputs(p, ml, expdest);
+			p += mb >> 8;
 			break;
 		case CTLESC:
 			startloc++;
