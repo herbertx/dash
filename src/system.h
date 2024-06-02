@@ -118,6 +118,13 @@ long sysconf(int) __attribute__((__noreturn__));
 int isblank(int c);
 #endif
 
+#ifndef HAVE_TEE
+static inline ssize_t tee(int fd_in, int fd_out, size_t len, unsigned int flags)
+{
+	return -1;
+}
+#endif
+
 #ifndef HAVE_FNMATCH
 static inline int fnmatch(const char *pattern, const char *string, int flags)
 {

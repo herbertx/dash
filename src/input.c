@@ -57,14 +57,18 @@
 #include "redir.h"
 #include "shell.h"
 #include "syntax.h"
+#include "system.h"
 #include "trap.h"
 
 #define IBUFSIZ (BUFSIZ + PUNGETC_MAX + 1)
 
+MKINIT
 struct stdin_state {
 	tcflag_t canon;
 	off_t seekable;
 	struct termios tios;
+	int pip[2];
+	int pending;
 };
 
 MKINIT struct parsefile basepf;	/* top level input file */
@@ -85,6 +89,7 @@ static int preadbuffer(void);
 
 #ifdef mkinit
 INCLUDE <stdio.h>
+INCLUDE <string.h>
 INCLUDE <termios.h>
 INCLUDE <unistd.h>
 INCLUDE "input.h"
@@ -117,6 +122,11 @@ FORKRESET {
 		close(parsefile->fd);
 		parsefile->fd = 0;
 	}
+	if (stdin_state.pip[0]) {
+		close(stdin_state.pip[0]);
+		close(stdin_state.pip[1]);
+		memset(stdin_state.pip, 0, sizeof(stdin_state.pip));
+	}
 }
 
 POSTEXITRESET {
@@ -143,6 +153,43 @@ static bool stdin_bufferable(void)
 		input_init();
 
 	return st->canon || st->seekable;
+}
+
+static void flush_tee(void *buf, int nr, int pending)
+{
+	while (pending > 0) {
+		int err;
+
+		err = read(0, buf, nr > pending ? pending : nr);
+		if (err > 0)
+			pending -= err;
+	}
+}
+
+static int stdin_tee(void *buf, int nr)
+{
+	int err;
+
+	if (stdin_istty)
+		return 0;
+
+	if (!stdin_state.pip[0]) {
+		err = pipe(stdin_state.pip);
+		if (err < 0)
+			return err;
+		if (stdin_state.pip[0] < 10)
+			stdin_state.pip[0] = savefd(stdin_state.pip[0],
+						    stdin_state.pip[0]);
+		if (stdin_state.pip[1] < 10)
+			stdin_state.pip[1] = savefd(stdin_state.pip[1],
+						    stdin_state.pip[1]);
+	}
+
+	flush_tee(buf, nr, stdin_state.pending);
+
+	err = tee(0, stdin_state.pip[1], nr, 0);
+	stdin_state.pending = err;
+	return err;
 }
 
 static void freestrings(struct strpush *sp)
@@ -280,10 +327,17 @@ retry:
 	}
 #endif
 
-	if (!fd && !stdin_bufferable())
-		nr = 1;
+	if (!fd && !stdin_bufferable()) {
+		nr = stdin_tee(buf, nr);
+		fd = stdin_state.pip[0];
+		if (nr <= 0) {
+			fd = 0;
+			nr = 1;
+		}
+	}
 
-	nr = read(fd, buf, nr);
+	if (nr >= 0)
+		nr = read(fd, buf, nr);
 
 	if (nr < 0) {
 		if (errno == EINTR && !(basepf.prev && pending_sig))
@@ -621,12 +675,15 @@ void __attribute__((noinline)) flush_input(void)
 {
 	int left = basepf.nleft + input_get_lleft(&basepf);
 
-	if (stdin_state.seekable && left) {
-		INTOFF;
+	INTOFF;
+	if (stdin_state.seekable && left)
 		lseek(0, -left, SEEK_CUR);
-		input_set_lleft(&basepf, basepf.nleft = 0);
-		INTON;
+	else if (stdin_state.pending > left) {
+		flush_tee(basebuf, BUFSIZ, stdin_state.pending - left);
+		stdin_state.pending = 0;
 	}
+	input_set_lleft(&basepf, basepf.nleft = 0);
+	INTON;
 }
 
 void reset_input(void)
