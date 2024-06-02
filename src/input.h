@@ -45,6 +45,7 @@
 #define PUNGETC_MAX (MB_LEN_MAX > 16 ? MB_LEN_MAX : 16)
 
 /* PEOF (the end of file marker) is defined in syntax.h */
+#define PEOA ((PEOF) - 1)
 
 enum {
 	INPUT_PUSH_FILE = 1,
@@ -102,7 +103,7 @@ extern struct parsefile *parsefile;
 #define plinno (parsefile->linno)
 
 int pgetc(void);
-int pgetc2(void);
+int pgetc_eoa(void);
 void pungetc(void);
 void pungetn(int);
 void pushstring(char *, void *);

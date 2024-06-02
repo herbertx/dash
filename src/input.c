@@ -157,7 +157,7 @@ static int __pgetc(void)
  * Nul characters in the input are silently discarded.
  */
 
-int pgetc(void)
+int __attribute__((noinline)) pgetc(void)
 {
 	struct strpush *sp = parsefile->spfree;
 
@@ -165,6 +165,12 @@ int pgetc(void)
 		freestrings(sp);
 
 	return __pgetc();
+}
+
+int pgetc_eoa(void)
+{
+	return parsefile->strpush && parsefile->nleft == -1 &&
+	       parsefile->strpush->ap ? PEOA : pgetc();
 }
 
 static int stdin_clear_nonblock(void)
