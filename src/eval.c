@@ -457,7 +457,8 @@ evalcase(union node *n, int flags)
 		lineno -= funcline - 1;
 
 	arglist.lastp = &arglist.list;
-	expandarg(n->ncase.expr, &arglist, EXP_TILDE);
+	expandarg(n->ncase.expr, &arglist, FNMATCH_IS_ENABLED ? EXP_TILDE :
+					   EXP_TILDE | EXP_MBCHAR);
 	for (cp = n->ncase.cases ; cp && evalskip == 0 ; cp = cp->nclist.next) {
 		for (patp = cp->nclist.pattern ; patp ; patp = patp->narg.next) {
 			if (casematch(patp, arglist.list->text)) {
