@@ -44,6 +44,7 @@ union node;
 #define CTLVAR -126		/* variable defn */
 #define CTLENDVAR -125
 #define CTLBACKQ -124
+#define CTLMBCHAR -123
 #define	CTLARI -122		/* arithmetic expression */
 #define	CTLENDARI -121
 #define	CTLQUOTEMARK -120

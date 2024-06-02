@@ -544,8 +544,10 @@ static char *scanleft(char *startp, char *endp, char *rmesc, char *rmescend,
 	loc = startp;
 	loc2 = rmesc;
 	do {
-		int match;
 		const char *s = loc2;
+		unsigned ml;
+		int match;
+
 		c = *loc2;
 		if (zero) {
 			*loc2 = '\0';
@@ -554,12 +556,26 @@ static char *scanleft(char *startp, char *endp, char *rmesc, char *rmescend,
 		match = pmatch(str, s);
 		*loc2 = c;
 		if (match)
-			return loc;
-		if (quotes && *loc == (char)CTLESC)
+			return quotes ? loc : loc2;
+
+		if (!c)
+			break;
+
+		if (*loc != (char)CTLMBCHAR) {
+			if (*loc == (char)CTLESC)
+				loc++;
 			loc++;
-		loc++;
-		loc2++;
-	} while (c);
+			loc2++;
+			continue;
+		}
+
+		if (*++loc == (char)CTLESC)
+			loc++;
+
+		ml = (unsigned char)*loc;
+		loc += ml + 3;
+		loc2 += ml;
+	} while (1);
 	return 0;
 }
 
@@ -567,14 +583,16 @@ static char *scanleft(char *startp, char *endp, char *rmesc, char *rmescend,
 static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 		       char *str, int quotes, int zero
 ) {
-	int esc = 0;
+	size_t esc = 0;
 	char *loc;
 	char *loc2;
 
 	for (loc = endp, loc2 = rmescend; loc >= startp; loc2--) {
-		int match;
-		char c = *loc2;
 		const char *s = loc2;
+		char c = *loc2;
+		unsigned ml;
+		int match;
+
 		if (zero) {
 			*loc2 = '\0';
 			s = rmesc;
@@ -582,17 +600,23 @@ static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 		match = pmatch(str, s);
 		*loc2 = c;
 		if (match)
-			return loc;
+			return quotes ? loc : loc2;
 		loc--;
-		if (quotes) {
-			if (--esc < 0) {
-				esc = esclen(startp, loc);
-			}
-			if (esc % 2) {
-				esc--;
-				loc--;
-			}
+		if (!esc--)
+			esc = esclen(startp, loc);
+		if (esc % 2) {
+			esc--;
+			loc--;
+			continue;
 		}
+		if (*loc != (char)CTLMBCHAR)
+			continue;
+
+		ml = (unsigned char)*--loc;
+		loc -= ml + 2;
+		if (*loc == (char)CTLESC)
+			loc--;
+		loc2 -= ml - 1;
 	}
 	return 0;
 }
@@ -646,14 +670,11 @@ static char *subevalvar(char *start, char *str, int strloc, int startloc,
 		nstrloc = str - (char *)stackblock();
 	}
 
-	rmesc = startp;
-	if (quotes) {
-		rmesc = _rmescapes(startp, RMESCAPE_ALLOC | RMESCAPE_GROW);
-		if (rmesc != startp)
-			rmescend = expdest;
-		startp = stackblock() + startloc;
-		str = stackblock() + nstrloc;
-	}
+	rmesc = _rmescapes(startp, RMESCAPE_ALLOC | RMESCAPE_GROW);
+	if (rmesc != startp)
+		rmescend = expdest;
+	startp = stackblock() + startloc;
+	str = stackblock() + nstrloc;
 	rmescend--;
 
 	/* zero = subtype == VSTRIMLEFT || subtype == VSTRIMLEFTMAX */
@@ -663,16 +684,29 @@ static char *subevalvar(char *start, char *str, int strloc, int startloc,
 
 	endp = stackblock() + strloc - 1;
 	loc = scan(startp, endp, rmesc, rmescend, str, quotes, zero);
-	if (loc) {
-		if (zero) {
-			memmove(startp, loc, endp - loc);
-			loc = startp + (endp - loc);
+	if (!loc) {
+		if (quotes) {
+			rmesc = startp;
+			rmescend = endp;
 		}
-		*loc = '\0';
-	} else
-		loc = endp;
+	} else if (!quotes) {
+		if (zero)
+			rmesc = loc;
+		else
+			rmescend = loc;
+	} else if (zero) {
+		rmesc = loc;
+		rmescend = endp;
+	} else {
+		rmesc = startp;
+		rmescend = loc;
+	}
+
+	memmove(startp, rmesc, rmescend - rmesc);
+	loc = startp + (rmescend - rmesc);
 
 out:
+	*loc = '\0';
 	amount = loc - expdest;
 	STADJUST(amount, expdest);
 
@@ -698,6 +732,7 @@ evalvar(char *p, int flag)
 	ssize_t varlen;
 	int discard;
 	int quoted;
+	int mbchar;
 
 	varflags = *p++ & ~VSBIT;
 	subtype = varflags & VSTYPE;
@@ -707,8 +742,18 @@ evalvar(char *p, int flag)
 	startloc = expdest - (char *)stackblock();
 	p = strchr(p, '=') + 1;
 
+	mbchar = 0;
+	switch (subtype) {
+	case VSTRIMLEFT:
+	case VSTRIMLEFTMAX:
+	case VSTRIMRIGHT:
+	case VSTRIMRIGHTMAX:
+		mbchar = EXP_MBCHAR;
+		break;
+	}
+
 again:
-	varlen = varvalue(var, varflags, flag, quoted);
+	varlen = varvalue(var, varflags, flag | mbchar, quoted);
 	if (varflags & VSNUL)
 		varlen--;
 
@@ -814,14 +859,31 @@ static struct mbpair mbtodest(const char *p, char *q, const char *syntax,
 	size_t ml;
 
 	ml = mbrlen(--p, len, &mbs);
-	if (ml == -2 || ml == -1 || ml < 2)
+	if (ml == -2 || ml == -1 || ml < 2) {
+		q = chtodest((signed char)*p, syntax, q);
 		ml = 1;
+		goto out;
+	}
 
 	len = ml;
 	do {
 		q = chtodest((signed char)*p++, syntax, q);
 	} while (--len);
+	goto out;
 
+	if (syntax[CTLMBCHAR] == CCTL) {
+		USTPUTC(CTLMBCHAR, q);
+		USTPUTC(ml, q);
+	}
+
+	q = mempcpy(q, p, ml);
+
+	if (syntax[CTLMBCHAR] == CCTL) {
+		USTPUTC(ml, q);
+		USTPUTC(CTLMBCHAR, q);
+	}
+
+out:
 	mbp.ml = ml - 1;
 	mbp.ql = q - q0;
 	return mbp;
@@ -841,13 +903,15 @@ static size_t memtodest(const char *p, size_t len, int flags)
 	if (unlikely(!len))
 		return 0;
 
-	q = makestrspace(len * 2, expdest);
+	/* CTLMBCHAR, 2, c, c, 2, CTLMBCHAR */
+	q = makestrspace(len * 3, expdest);
 
-#if QUOTES_ESC != 0x11 || EXP_QUOTED != 0x100
-#error QUOTES_ESC != 0x11 || EXP_QUOTED != 0x100
+#if QUOTES_ESC != 0x11 || EXP_MBCHAR != 0x20 || EXP_QUOTED != 0x100
+#error QUOTES_ESC != 0x11 || EXP_MBCHAR != 0x20 || EXP_QUOTED != 0x100
 #endif
 	expq = flags & EXP_QUOTED;
-	if (likely(!(flags & (expq >> 4 | expq >> 8) & QUOTES_ESC))) {
+	if (likely(!(flags & (expq >> 3 | expq >> 4 | expq >> 8) &
+		     (QUOTES_ESC | EXP_MBCHAR)))) {
 		while (len >= 8) {
 			uint64_t x = *(uint64_t *)(p + count);
 
@@ -864,7 +928,8 @@ static size_t memtodest(const char *p, size_t len, int flags)
 		q += count;
 		p += count;
 
-		syntax = flags & QUOTES_ESC ? BASESYNTAX : is_type;
+		syntax = flags & (QUOTES_ESC | EXP_MBCHAR) ?
+			 BASESYNTAX : is_type;
 	} else
 		syntax = SQSYNTAX;
 
@@ -1772,17 +1837,25 @@ _rmescapes(char *str, int flag)
 	inquotes = 0;
 	notescaped = globbing;
 	while (*p) {
+		unsigned ml;
+		int newnesc = globbing;
+
 		if (*p == (char)CTLQUOTEMARK) {
 			p++;
 			inquotes ^= globbing;
 			continue;
-		}
-		if (*p == '\\') {
+		} else if (*p == '\\') {
 			/* naked back slash */
-			notescaped ^= globbing;
-			goto copy;
-		}
-		if (*p == (char)CTLESC) {
+			newnesc ^= notescaped;
+		} else if (*p == (char)CTLMBCHAR) {
+			if (*++p == (char)CTLESC)
+				p++;
+
+			ml = (unsigned char)*p++;
+			q = mempcpy(q, p, ml);
+			p += ml + 2;
+			goto setnesc;
+		} else if (*p == (char)CTLESC) {
 			p++;
 			if (notescaped)
 				*q++ = '\\';
@@ -1791,9 +1864,10 @@ _rmescapes(char *str, int flag)
 				*q++ = '\\';
 			}
 		}
-		notescaped = globbing;
-copy:
+
 		*q++ = *p++;
+setnesc:
+		notescaped = newnesc;
 	}
 	*q = '\0';
 	if (flag & RMESCAPE_GROW) {

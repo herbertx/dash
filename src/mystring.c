@@ -64,7 +64,7 @@ const char dolatstr[] = { CTLQUOTEMARK, CTLVAR, VSNORMAL | VSBIT, '@', '=',
 			  CTLQUOTEMARK, '\0' };
 const char cqchars[] = {
 	'\\',
-	CTLESC, CTLQUOTEMARK, 0
+	CTLESC, CTLMBCHAR, CTLQUOTEMARK, 0
 };
 const char illnum[] = "Illegal number: %s";
 const char homestr[] = "HOME";
