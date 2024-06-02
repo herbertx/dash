@@ -81,11 +81,11 @@ static inline char *_STPUTC(int c, char *p) {
 #define STPUTC(c, p) ((p) = _STPUTC((c), (p)))
 #define CHECKSTRSPACE(n, p) \
 	({ \
-		char *q = (p); \
-		size_t l = (n); \
-		size_t m = sstrend - q; \
-		if (l > m) \
-			(p) = makestrspace(l, q); \
+		char *_q = (p); \
+		size_t _l = (n); \
+		size_t _m = sstrend - _q; \
+		if (_l > _m) \
+			(p) = makestrspace(_l, _q); \
 		0; \
 	})
 #define USTPUTC(c, p)	(*p++ = (c))

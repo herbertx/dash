@@ -54,6 +54,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wchar.h>
 
 /*
  * Routines to expand arguments to commands.  We have to deal with
@@ -790,6 +791,41 @@ really_record:
 	return p;
 }
 
+static char *chtodest(int c, const char *syntax, char *out)
+{
+	if (syntax[c] == CCTL)
+		USTPUTC(CTLESC, out);
+	USTPUTC(c, out);
+
+	return out;
+}
+
+struct mbpair {
+	unsigned ml;
+	unsigned ql;
+};
+
+static struct mbpair mbtodest(const char *p, char *q, const char *syntax,
+			      size_t len)
+{
+	mbstate_t mbs = {};
+	struct mbpair mbp;
+	char *q0 = q;
+	size_t ml;
+
+	ml = mbrlen(--p, len, &mbs);
+	if (ml == -2 || ml == -1 || ml < 2)
+		ml = 1;
+
+	len = ml;
+	do {
+		q = chtodest((signed char)*p++, syntax, q);
+	} while (--len);
+
+	mbp.ml = ml - 1;
+	mbp.ql = q - q0;
+	return mbp;
+}
 
 /*
  * Put a string on the stack.
@@ -797,38 +833,72 @@ really_record:
 
 static size_t memtodest(const char *p, size_t len, int flags)
 {
-	const char *syntax = flags & EXP_QUOTED ? DQSYNTAX : BASESYNTAX;
+	const char *syntax;
+	size_t count = 0;
+	int expq;
 	char *q;
-	char *s;
 
 	if (unlikely(!len))
 		return 0;
 
 	q = makestrspace(len * 2, expdest);
-	s = q;
 
-	do {
+#if QUOTES_ESC != 0x11 || EXP_QUOTED != 0x100
+#error QUOTES_ESC != 0x11 || EXP_QUOTED != 0x100
+#endif
+	expq = flags & EXP_QUOTED;
+	if (likely(!(flags & (expq >> 4 | expq >> 8) & QUOTES_ESC))) {
+		while (len >= 8) {
+			uint64_t x = *(uint64_t *)(p + count);
+
+			if ((x | (x - 0x0101010101010101)) &
+			    0x8080808080808080)
+				break;
+
+			*(uint64_t *)(q + count) = x;
+
+			count += 8;
+			len -= 8;
+		}
+
+		q += count;
+		p += count;
+
+		syntax = flags & QUOTES_ESC ? BASESYNTAX : is_type;
+	} else
+		syntax = SQSYNTAX;
+
+	for (; len; len--) {
 		int c = (signed char)*p++;
-		if (c) {
-			if ((flags & QUOTES_ESC) &&
-			    ((syntax[c] == CCTL) ||
-			     (flags & EXP_QUOTED && syntax[c] == CBACK)))
-				USTPUTC(CTLESC, q);
-		} else if (!(flags & EXP_KEEPNUL))
+
+		if (unlikely(!c && !(flags & EXP_KEEPNUL)))
 			continue;
-		USTPUTC(c, q);
-	} while (--len);
+
+		count++;
+
+		if (unlikely(c < 0)) {
+			struct mbpair mbp = mbtodest(p, q, syntax, len);
+			unsigned mlm;
+
+			q += mbp.ql;
+			mlm = mbp.ml;
+			p += mlm;
+			len -= mlm;
+			continue;
+		}
+
+		q = chtodest(c, syntax, q);
+	}
 
 	expdest = q;
-	return q - s;
+	return count;
 }
 
 
 static size_t strtodest(const char *p, int flags)
 {
 	size_t len = strlen(p);
-	memtodest(p, len, flags);
-	return len;
+	return memtodest(p, len, flags);
 }
 
 
@@ -850,6 +920,7 @@ varvalue(char *name, int varflags, int flags, int quoted)
 	int discard = (subtype == VSPLUS || subtype == VSLENGTH) |
 		      (flags & EXP_DISCARD);
 	ssize_t len = 0;
+	size_t start;
 	char c;
 
 	if (!subtype) {
@@ -859,9 +930,9 @@ varvalue(char *name, int varflags, int flags, int quoted)
 		sh_error("Bad substitution");
 	}
 
-	flags |= EXP_KEEPNUL;
 	flags &= discard ? ~QUOTES_ESC : ~0;
 	sep = (flags & EXP_FULL) << CHAR_BIT;
+	start = expdest - (char *)stackblock();
 
 	switch (*name) {
 	case '$':
@@ -921,7 +992,7 @@ param:
 
 			if (*ap && sep) {
 				len++;
-				memtodest(&sepc, 1, flags);
+				memtodest(&sepc, 1, flags | EXP_KEEPNUL);
 			}
 		}
 		break;
@@ -951,7 +1022,7 @@ value:
 	}
 
 	if (discard)
-		STADJUST(-len, expdest);
+		expdest = (char *)stackblock() + start;
 
 	return len;
 }
