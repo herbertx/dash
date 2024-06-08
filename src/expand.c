@@ -1722,6 +1722,9 @@ static char *expmeta(char *name, unsigned name_len, size_t expdir_len)
 
 		if (*dname == '.' && !matchdot)
 			goto check_int;
+		if (c && dp->d_type != DT_DIR && dp->d_type != DT_LNK &&
+		    dp->d_type != DT_UNKNOWN)
+			goto check_int;
 		len = strlen(dname) + 1;
 		p = dname;
 		if (!FNMATCH_IS_ENABLED) {
