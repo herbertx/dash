@@ -892,7 +892,7 @@ unsigned getmbc(int c, char *out, int mode)
 	wchar_t wc;
 	char *mbc;
 
-	if (likely(c >= 0))
+	if (likely(c >= 0 || c <= PEOF))
 		return 0;
 
 	mbc = (mode & 3) < 2 ? out + 2 + (mode == 1) : out;
