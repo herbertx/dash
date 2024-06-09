@@ -224,15 +224,13 @@ static int __pgetc(void)
 	if (parsefile->unget) {
 		long unget = -(long)(unsigned)parsefile->unget--;
 
-		if (parsefile->nleft < 0)
-			return preadbuffer();
-
 		return parsefile->nextc[unget];
 	}
 
-	if (--parsefile->nleft >= 0)
+	if (parsefile->nleft > 0) {
+		parsefile->nleft--;
 		c = (signed char)*parsefile->nextc++;
-	else
+	} else
 		c = preadbuffer();
 
 	return c;
@@ -372,8 +370,11 @@ static int preadbuffer(void)
 		popstring();
 		return __pgetc();
 	}
-	if (parsefile->buf == NULL)
+	if (parsefile->eof & 2) {
+eof:
+		parsefile->eof = 3;
 		return PEOF;
+	}
 	flushall();
 
 	q = parsefile->nextc;
@@ -394,7 +395,7 @@ again:
 			if (!IS_DEFINED_SMALL && nr > 0)
 				goto save;
 			INTON;
-			return PEOF;
+			goto eof;
 		}
 	}
 
@@ -477,7 +478,8 @@ void pungetn(int n)
 void
 pungetc(void)
 {
-	pungetn(1);
+	pungetn(1 - (parsefile->eof & 1));
+	parsefile->eof &= ~1;
 }
 
 /*
@@ -575,8 +577,6 @@ setinputfd(int fd, int push)
 		toppf = parsefile;
 	parsefile->fd = fd;
 	parsefile->nextc = parsefile->buf = ckmalloc(IBUFSIZ);
-	input_set_lleft(parsefile, parsefile->nleft = 0);
-	plinno = 1;
 }
 
 
@@ -591,8 +591,7 @@ setinputstring(char *string)
 	pushfile();
 	parsefile->nextc = string;
 	parsefile->nleft = strlen(string);
-	parsefile->buf = NULL;
-	plinno = 1;
+	parsefile->eof = 2;
 	INTON;
 }
 
@@ -609,12 +608,10 @@ pushfile(void)
 	struct parsefile *pf;
 
 	pf = (struct parsefile *)ckmalloc(sizeof (struct parsefile));
+	memset(pf, 0, sizeof(*pf));
 	pf->prev = parsefile;
+	pf->linno = 1;
 	pf->fd = -1;
-	pf->strpush = NULL;
-	pf->spfree = NULL;
-	pf->basestrpush.prev = NULL;
-	pf->unget = 0;
 	parsefile = pf;
 }
 
@@ -639,8 +636,7 @@ popfile(void)
 
 	if (pf->fd >= 0)
 		close(pf->fd);
-	if (pf->buf)
-		ckfree(pf->buf);
+	ckfree(pf->buf);
 	if (parsefile->spfree)
 		freestrings(parsefile->spfree);
 	while (pf->strpush) {

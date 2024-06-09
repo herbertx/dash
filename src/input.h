@@ -79,9 +79,7 @@ struct parsefile {
 	int linno;		/* current line */
 	int fd;			/* file descriptor (or -1 if string) */
 	int nleft;		/* number of chars left in this line */
-#ifndef SMALL
-	int lleft;		/* number of chars left in this buffer */
-#endif
+	int eof;		/* do not read again once we hit EOF */
 	char *nextc;		/* next char in buffer */
 	char *buf;		/* input buffer */
 	struct strpush *strpush; /* for pushing strings at this level */
@@ -89,6 +87,10 @@ struct parsefile {
 
 	/* Delay freeing so we can stop nested aliases. */
 	struct strpush *spfree;
+
+#ifndef SMALL
+	int lleft;		/* number of chars left in this buffer */
+#endif
 
 	/* Number of outstanding calls to pungetc. */
 	int unget;
