@@ -1298,15 +1298,9 @@ parsesub: {
 	char *p;
 	static const char types[] = "}-+?=";
 
-	c = pgetc_eatbnl();
-	if (c != '(' && c != '{' && !is_name(c) && !is_special(c)) {
-		USTPUTC('$', out);
-		pungetc();
-		goto parsesub_return;
-	}
-
 	USTPUTC('$', out);
 
+	c = pgetc_eatbnl();
 	if (c == '(') {		/* $(command) or $((arith)) */
 		USTPUTC(c, out);
 		if (pgetc_eatbnl() == '(') {
@@ -1315,7 +1309,7 @@ parsesub: {
 			pungetc();
 			PARSEBACKQNEW();
 		}
-	} else {
+	} else if (c == '{' || is_name(c) || is_special(c)) {
 		const char *newsyn = synstack->syntax;
 
 		typeloc = out - (char *)stackblock();
@@ -1441,7 +1435,9 @@ badsub:
 			*((char *)stackblock() + typeloc) = subtype | VSBIT;
 			STPUTC('=', out);
 		}
-	}
+	} else
+		pungetc();
+
 	goto parsesub_return;
 }
 
