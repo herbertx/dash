@@ -1293,10 +1293,9 @@ parseredir: {
  */
 
 parsesub: {
-	int subtype;
-	int typeloc;
-	char *p;
 	static const char types[] = "}-+?=";
+	int subtype;
+	char *p;
 
 	USTPUTC('$', out);
 
@@ -1310,13 +1309,10 @@ parsesub: {
 			PARSEBACKQNEW();
 		}
 	} else if (c == '{' || is_name(c) || is_special(c)) {
+		int typeloc = out - (char *)stackblock();
 		const char *newsyn = synstack->syntax;
 
-		typeloc = out - (char *)stackblock();
-		if (!chkeofmark) {
-			out[-1] = CTLVAR;
-			STADJUST(1, out);
-		}
+		STADJUST(!chkeofmark, out);
 		subtype = VSNORMAL;
 		if (likely(c == '{')) {
 			if (chkeofmark)
@@ -1432,7 +1428,10 @@ badsub:
 				synstack->dqvarnest++;
 		}
 		if (!chkeofmark) {
-			*((char *)stackblock() + typeloc) = subtype | VSBIT;
+			char *p = stackblock();
+
+			p[typeloc - 1] = CTLVAR;
+			p[typeloc] = subtype | VSBIT;
 			STPUTC('=', out);
 		}
 	} else
