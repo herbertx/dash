@@ -28,6 +28,7 @@
 
 #include <limits.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 #ifndef SSIZE_MAX
@@ -188,3 +189,5 @@ static inline void globfree64(glob64_t *pglob)
  * code
  */
 #define uninitialized_var(x) x = x
+
+unsigned conv_escape(char *str, char *out, bool mbchar);

@@ -29,8 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-
+#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -38,10 +37,10 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static int	 conv_escape_str(char *, char **);
-static char	*conv_escape(char *, int *);
 static int	 getchr(void);
 static double	 getdouble(void);
 static uintmax_t getuintmax(int);
@@ -56,6 +55,7 @@ static char  **gargv;
 #define octtobin(c)	((c) - '0')
 
 #include "bltin.h"
+#include "parser.h"
 #include "system.h"
 
 #define PF(f, func) { \
@@ -164,13 +164,17 @@ int printfcmd(int argc, char *argv[])
 			int *param;
 
 			if (ch == '\\') {
-				int c_ch;
-				fmt = conv_escape(fmt, &c_ch);
-				ch = c_ch;
-				goto pc;
+				unsigned ret;
+				char *cp;
+
+				STARTSTACKSTR(cp);
+				CHECKSTRSPACE(4, cp);
+				ret = conv_escape(fmt, cp, false);
+				fmt += ret >> 4;
+				out1mem(cp, ret & 15);
+				continue;
 			}
 			if (ch != '%' || (*fmt == '%' && (++fmt || 1))) {
-pc:
 				putchar(ch);
 				continue;
 			}
@@ -275,23 +279,30 @@ out:
 static int
 conv_escape_str(char *str, char **sp)
 {
-	int c;
-	int ch;
 	char *cp;
+	int c;
 
 	/* convert string into a temporary buffer... */
 	STARTSTACKSTR(cp);
 
 	do {
-		c = ch = *str++;
-		if (ch != '\\')
-			continue;
+		unsigned ret;
+		int ch;
+
+		CHECKSTRSPACE(4, cp);
 
 		c = *str++;
-		if (c == 'c') {
-			/* \c as in SYSV echo - abort all processing.... */
-			c = ch = 0x100;
+		if (c != '\\') {
+putchar:
+			USTPUTC(c, cp);
 			continue;
+		}
+
+		ch = *str;
+		if (ch == 'c') {
+			/* \c as in SYSV echo - abort all processing.... */
+			c = 0x100;
+			goto putchar;
 		}
 
 		/* 
@@ -299,34 +310,38 @@ conv_escape_str(char *str, char **sp)
 		 * They start with a \0, and are followed by 0, 1, 2, 
 		 * or 3 octal digits. 
 		 */
-		if (c == '0' && isodigit(*str))
+		if (ch == '0' && isodigit(str[1]))
 			str++;
 
 		/* Finally test for sequences valid in the format string */
-		str = conv_escape(str - 1, &c);
-	} while (STPUTC(c, cp), (char)ch);
+		ret = conv_escape(str, cp, false);
+		str += ret >> 4;
+		cp += ret & 15;
+	} while (c & 0xff);
 
 	*sp = cp;
 
-	return ch;
+	return c;
 }
 
 /*
  * Print "standard" escape characters 
  */
-static char *
-conv_escape(char *str, int *conv_ch)
+unsigned conv_escape(char *str0, char *out0, bool mbchar)
 {
-	int value;
+	char *out = out0;
+	char *str = str0;
+	unsigned value;
 	int ch;
 
 	ch = *str;
 
 	switch (ch) {
 	default:
-		if (!isodigit(*str)) {
-			value = '\\';
-			goto out;
+		if (!isodigit(ch)) {
+			value = ch ?: '\\';
+			str -= !ch;
+			break;
 		}
 
 		ch = 3;
@@ -334,12 +349,88 @@ conv_escape(char *str, int *conv_ch)
 		do {
 			value <<= 3;
 			value += octtobin(*str++);
-		} while (isodigit(*str) && --ch);
-		goto out;
+		} while (--ch && isodigit(*str));
+		str--;
+		break;
 
-	case '\\':	value = '\\';	break;	/* backslash */
+	case 'x':
+		ch = 2;
+
+hex:
+		value = 0;
+		do {
+			int c = *++str;
+			int d;
+
+			if (c >= '0' && c <= '9')
+				d = c - '0';
+			else {
+				int cl;
+
+				cl = c & ~0x20;
+				if (cl >= 'A' && cl <= 'F')
+					d = cl - 'A' + 10;
+				else {
+					str--;
+					break;
+				}
+			}
+
+			value <<= 4;
+			value += d;
+		} while (--ch);
+
+		if (value < 0x80)
+			break;
+
+		if (value < 0x110000) {
+			int mboff = (mbchar - 1) * 2;
+			unsigned uni = value;
+			int len;
+
+			value = 0x80 << 8 | (value & 0xfc0) << 2 |
+				0x80 | (value & 0x3f);
+
+			if (uni < 0x800) {
+				value |= 0x40 << 8;
+				len = 2;
+			} else {
+				value |= 0x80 << 16 | (uni & 0x3f000) << 4;
+				if (uni < 0x10000) {
+					value |= 0x60 << 16;
+					len = 3;
+				} else {
+					value |= 0xf0 << 24 |
+						 (uni & ~0x3ffff) << 6;
+					len = 4;
+				}
+			}
+
+			value = htonl(value << (4 - len) * 8);
+
+			USTPUTC(CTLMBCHAR, out);
+			USTPUTC(len, out);
+			STADJUST(mboff, out);
+			*(uint32_t *)out = value;
+			STADJUST(len, out);
+			USTPUTC(len, out);
+			USTPUTC(CTLMBCHAR, out);
+			STADJUST(mboff, out);
+		}
+
+		goto out_noput;
+
+	case 'u':
+		ch = 4;
+		goto hex;
+
+	case 'U':
+		ch = 8;
+		goto hex;
+
 	case 'a':	value = '\a';	break;	/* alert */
 	case 'b':	value = '\b';	break;	/* backspace */
+	case 'e':	value = '\033';	break;	/* <ESC> */
 	case 'f':	value = '\f';	break;	/* form-feed */
 	case 'n':	value = '\n';	break;	/* newline */
 	case 'r':	value = '\r';	break;	/* carriage-return */
@@ -347,10 +438,11 @@ conv_escape(char *str, int *conv_ch)
 	case 'v':	value = '\v';	break;	/* vertical-tab */
 	}
 
+	USTPUTC(value, out);
+
+out_noput:
 	str++;
-out:
-	*conv_ch = value;
-	return str;
+	return (out - out0) | (str - str0) << 4;
 }
 
 static char *

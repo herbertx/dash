@@ -931,6 +931,46 @@ unsigned getmbc(int c, char *out, int mode)
 	return 0;
 }
 
+static char *dollarsq_escape(char *out)
+{
+	/* 10 = length of UXXXXXXXX + NUL */
+	char str[10];
+	unsigned len;
+	char *p;
+
+	for (len = 0; len < sizeof(str) - 1; len++) {
+		int c = pgetc();
+
+		if (c <= PEOF)
+			break;
+
+		str[len] = c;
+	}
+	str[len] = 0;
+
+	p = str;
+	if (*p != 'c') {
+		unsigned ret;
+
+		ret = conv_escape(p, out, true);
+		p += ret >> 4;
+		out += ret & 15;
+	} else if (*++p) {
+		int conv_ch;
+		int c;
+
+		c = (unsigned char)*p++;
+
+		p += !((c ^ *p) | (c ^ '\\'));
+
+		conv_ch = (c & ~((c & 0x40) >> 1)) ^ 0x40;
+		USTPUTC(conv_ch, out);
+	}
+
+	pungetn(len - (p - str));
+	return out;
+}
+
 /*
  * If eofmark is NULL, read a word or a redirection symbol.  If eofmark
  * is not NULL, read a here document.  In the latter case, eofmark is the
@@ -953,21 +993,19 @@ unsigned getmbc(int c, char *out, int mode)
 STATIC int
 readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 {
-	int c = firstc;
-	char *out;
-	size_t len;
-	struct nodelist *bqlist;
-	int quotef;
-	int oldstyle;
-	/* syntax stack */
 	struct synstack synbase = { .syntax = syntax };
-	struct synstack *synstack = &synbase;
 	int chkeofmark = checkkwd & CHKEOFMARK;
+	struct synstack *synstack = &synbase;
+	struct nodelist *bqlist = NULL;
+	int dollarsq = 0;
+	int c = firstc;
+	int quotef = 0;
+	int oldstyle;
+	size_t len;
+	char *out;
 
 	if (syntax == DQSYNTAX)
 		synstack->dblquote = 1;
-	quotef = 0;
-	bqlist = NULL;
 
 	STARTSTACKSTR(out);
 	loop: {	/* for each line, until end of word */
@@ -1014,6 +1052,10 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 				USTPUTC(c, out);
 				break;
 			case CCTL:
+				if (c == dollarsq) {
+					out = dollarsq_escape(out);
+					break;
+				}
 				if ((!eofmark) | synstack->dblquote |
 				    synstack->varnest)
 					USTPUTC(CTLESC, out);
@@ -1055,6 +1097,7 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 				USTPUTC(c, out);
 				break;
 			case CSQUOTE:
+csquote:
 				synstack->syntax = SQSYNTAX;
 quotemark:
 				if (eofmark == NULL) {
@@ -1075,6 +1118,14 @@ toggledq:
 				}
 
 				if (synstack->dqvarnest == 0) {
+					if (likely(dollarsq)) {
+						char *p = stackblock();
+
+						*out = 0;
+						out = p + strlen(p);
+						dollarsq = 0;
+					}
+
 					synstack->syntax = BASESYNTAX;
 					synstack->dblquote = 0;
 				}
@@ -1293,6 +1344,7 @@ parseredir: {
  */
 
 parsesub: {
+	const char *newsyn = synstack->syntax;
 	static const char types[] = "}-+?=";
 	int subtype;
 	char *p;
@@ -1308,9 +1360,12 @@ parsesub: {
 			pungetc();
 			PARSEBACKQNEW();
 		}
+	} else if (c == '\'' && newsyn['&']) {
+		STADJUST(-1, out);
+		dollarsq = '\\';
+		goto csquote;
 	} else if (c == '{' || is_name(c) || is_special(c)) {
 		int typeloc = out - (char *)stackblock();
-		const char *newsyn = synstack->syntax;
 
 		STADJUST(!chkeofmark, out);
 		subtype = VSNORMAL;
