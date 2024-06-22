@@ -1282,7 +1282,7 @@ static char *ifsbreakup_slow(struct ifs_state *ifst, struct arglist *arglist,
 		/* Ignore IFS whitespace at start */
 		if (q == ifst->start && ifsspc) {
 			ifst->start = p;
-			return p;
+			goto out_zero_ifsspc;
 		}
 		if (ifst->maxargs > 0 && !--ifst->maxargs) {
 			ifst->r = q;
@@ -1297,6 +1297,7 @@ static char *ifsbreakup_slow(struct ifs_state *ifst, struct arglist *arglist,
 		return p;
 	}
 
+out_zero_ifsspc:
 	ifst->ifsspc = 0;
 	return p;
 }
