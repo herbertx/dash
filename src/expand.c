@@ -1634,6 +1634,19 @@ static char *expmeta_rmescapes(char *enddir, const char *name)
 	return enddir - 1;
 }
 
+#ifndef HAVE_MEMRCHR
+static void *memrchr(const void *s, int c, size_t n)
+{
+	const unsigned char *str = s;
+	const unsigned char *cp;
+
+	for (cp = str + n - 1; cp >= str; cp--)
+		if (*cp == c)
+			return cp;
+	return NULL;
+}
+#endif
+
 /*
  * Do metacharacter (i.e. *, ?, [...]) expansion.
  */

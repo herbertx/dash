@@ -87,7 +87,7 @@ AC_CHECK_DECL([PRIdMAX],,
 
 dnl Checks for library functions.
 AC_CHECK_FUNCS(bsearch faccessat getpwnam getrlimit isalpha killpg \
-	       memfd_create mempcpy \
+	       memfd_create memrchr mempcpy \
 	       sigsetmask stpcpy strchrnul strsignal strtod strtoimax \
 	       strtoumax sysconf tee)
 
