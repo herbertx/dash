@@ -371,7 +371,7 @@ addquote:
 			c = (signed char)*p--;
 			mb = mbnext(p);
 			ml = (mb >> 8) - 2;
-			if (flag & QUOTES_ESC) {
+			if (flag & (QUOTES_ESC | EXP_MBCHAR)) {
 				length = (mb >> 8) + (mb & 0xff);
 				if (c == (char)CTLESC)
 					startloc += length;
