@@ -938,13 +938,16 @@ static char *dollarsq_escape(char *out)
 	unsigned len;
 	char *p;
 
-	for (len = 0; len < sizeof(str) - 1; len++) {
+	for (len = 0; len < sizeof(str) - 1;) {
 		int c = pgetc();
 
 		if (c <= PEOF)
 			break;
 
-		str[len] = c;
+		str[len++] = c;
+
+		if (c == '\'')
+			break;
 	}
 	str[len] = 0;
 
