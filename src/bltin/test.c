@@ -353,9 +353,9 @@ binop(void)
 		/* NOTREACHED */
 #endif
 	case STREQ:
-		return strcoll(opnd1, opnd2) == 0;
+		return strcmp(opnd1, opnd2) == 0;
 	case STRNE:
-		return strcoll(opnd1, opnd2) != 0;
+		return strcmp(opnd1, opnd2) != 0;
 	case STRLT:
 		return strcoll(opnd1, opnd2) < 0;
 	case STRGT:
