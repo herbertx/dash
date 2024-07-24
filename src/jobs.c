@@ -904,6 +904,9 @@ static void forkchild(struct job *jp, union node *n, int mode)
 		if (jp->nprocs == 0) {
 			close(0);
 			sh_open(_PATH_DEVNULL, O_RDONLY, 0);
+			/* Should call reset_input here, but it's harmless
+			 * for now.
+			 */
 		}
 	}
 	if (!oldlvl && iflag) {
