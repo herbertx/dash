@@ -595,6 +595,7 @@ evalpipe(union node *n, int flags)
 				close(pip[0]);
 			}
 			if (prevfd > 0) {
+				reset_input();
 				dup2(prevfd, 0);
 				close(prevfd);
 			}
