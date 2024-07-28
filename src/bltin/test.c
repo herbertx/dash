@@ -8,17 +8,17 @@
  * This program is in the Public Domain.
  */
 
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <fcntl.h>
-#include <inttypes.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdarg.h>
 #include "bltin.h"
 #include "../exec.h"
+#include <fcntl.h>
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 /* test(1) accepts the following grammar:
 	oexpr	::= aexpr | aexpr "-o" oexpr ;
@@ -146,8 +146,8 @@ static int binop(void);
 static int filstat(char *, enum token);
 static enum token t_lex(char **);
 static int isoperand(char **);
-static int newerf(const char *, const char *);
-static int olderf(const char *, const char *);
+static bool newerf(const char *, const char *);
+static bool olderf(const char *, const char *);
 static int equalf(const char *, const char *);
 
 #ifdef HAVE_FACCESSAT
@@ -466,39 +466,39 @@ static int isoperand(char **tp)
 	return op && op->op_type == BINOP;
 }
 
-static int
-newerf (const char *f1, const char *f2)
+static bool newerf(const char *f1, const char *f2)
 {
 	struct stat64 b1, b2;
 
+	if (stat64(f1, &b1) != 0)
+		return false;
+	if (stat64(f2, &b2) != 0)
+		return true;
+
 #ifdef HAVE_ST_MTIM
-	return (stat64(f1, &b1) == 0 &&
-		stat64(f2, &b2) == 0 &&
-		( b1.st_mtim.tv_sec > b2.st_mtim.tv_sec ||
-		 (b1.st_mtim.tv_sec == b2.st_mtim.tv_sec && (b1.st_mtim.tv_nsec > b2.st_mtim.tv_nsec )))
-	);
+	return b1.st_mtim.tv_sec > b2.st_mtim.tv_sec ||
+	       (b1.st_mtim.tv_sec == b2.st_mtim.tv_sec &&
+		b1.st_mtim.tv_nsec > b2.st_mtim.tv_nsec);
 #else
-	return (stat64(f1, &b1) == 0 &&
-		stat64(f2, &b2) == 0 &&
-		b1.st_mtime > b2.st_mtime);
+	return b1.st_mtime > b2.st_mtime;
 #endif
 }
 
-static int
-olderf (const char *f1, const char *f2)
+static bool olderf(const char *f1, const char *f2)
 {
 	struct stat64 b1, b2;
 
+	if (stat64(f2, &b2) != 0)
+		return false;
+	if (stat64(f1, &b1) != 0)
+		return true;
+
 #ifdef HAVE_ST_MTIM
-	return (stat64(f1, &b1) == 0 &&
-		stat64(f2, &b2) == 0 &&
-		(b1.st_mtim.tv_sec < b2.st_mtim.tv_sec ||
-		 (b1.st_mtim.tv_sec == b2.st_mtim.tv_sec && (b1.st_mtim.tv_nsec < b2.st_mtim.tv_nsec )))
-	);
+	return b1.st_mtim.tv_sec < b2.st_mtim.tv_sec ||
+	       (b1.st_mtim.tv_sec == b2.st_mtim.tv_sec &&
+		b1.st_mtim.tv_nsec < b2.st_mtim.tv_nsec);
 #else
-	return (stat64(f1, &b1) == 0 &&
-		stat64(f2, &b2) == 0 &&
-		b1.st_mtime < b2.st_mtime);
+	return b1.st_mtime < b2.st_mtime;
 #endif
 }
 
