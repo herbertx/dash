@@ -115,7 +115,7 @@ histedit(void)
 			if (el != NULL) {
 				if (hist)
 					el_set(el, EL_HIST, history, hist);
-				el_set(el, EL_PROMPT, getprompt);
+				el_set(el, EL_PROMPT_ESC, getprompt, '\1');
 			} else {
 bad:
 				out2str("sh: can't initialize editing\n");
