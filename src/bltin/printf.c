@@ -339,8 +339,8 @@ unsigned conv_escape(char *str0, char *out0, bool mbchar)
 	switch (ch) {
 	default:
 		if (!isodigit(ch)) {
-			value = ch ?: '\\';
-			str -= !ch;
+			value = '\\';
+			str--;
 			break;
 		}
 
@@ -427,6 +427,12 @@ hex:
 	case 'U':
 		ch = 8;
 		goto hex;
+
+	case '\\':
+	case '\"':
+	case '\'':
+		value = ch;
+		break;
 
 	case 'a':	value = '\a';	break;	/* alert */
 	case 'b':	value = '\b';	break;	/* backspace */
