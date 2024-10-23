@@ -2157,7 +2157,8 @@ is
 .Li 0
 or
 .Li EXIT ,
-the action is executed when the shell exits.
+the action is executed when the shell exits normally (that is not via an
+unhandled signal like SIGINT).
 .Ar action
 may be empty
 .Li ( "''" ) ,
