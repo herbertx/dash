@@ -335,21 +335,29 @@ unsigned conv_escape(char *str0, char *out0, bool mbchar)
 	int ch;
 
 	ch = *str;
+	value = ch;
 
 	switch (ch) {
 	default:
-		if (!isodigit(ch)) {
-			value = '\\';
-			str--;
+		if (ch == '"' || ch == '\'')
 			break;
+
+		if (ch == 'U') {
+			ch = 8;
+			goto hex;
 		}
 
-		ch = 3;
-		value = 0;
-		do {
-			value <<= 3;
-			value += octtobin(*str++);
-		} while (--ch && isodigit(*str));
+		value = '\\';
+
+		if (isodigit(ch)) {
+			ch = 3;
+			value = 0;
+			do {
+				value <<= 3;
+				value += octtobin(*str++);
+			} while (--ch && isodigit(*str));
+		}
+
 		str--;
 		break;
 
@@ -424,20 +432,17 @@ hex:
 		ch = 4;
 		goto hex;
 
-	case 'U':
-		ch = 8;
-		goto hex;
-
 	case '\\':
-	case '\"':
-	case '\'':
-		value = ch;
 		break;
 
-	case 'a':	value = '\a';	break;	/* alert */
-	case 'b':	value = '\b';	break;	/* backspace */
+	case 'a':				/* alert */
+	case 'b':				/* backspace */
+	case 'f':				/* form-feed */
+		value -= 'a';
+		value += '\a';
+		break;
+
 	case 'e':	value = '\033';	break;	/* <ESC> */
-	case 'f':	value = '\f';	break;	/* form-feed */
 	case 'n':	value = '\n';	break;	/* newline */
 	case 'r':	value = '\r';	break;	/* carriage-return */
 	case 't':	value = '\t';	break;	/* tab */
