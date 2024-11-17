@@ -621,18 +621,15 @@ static char *scanleft(char *startp, char *endp, char *rmesc, char *rmescend,
 		match = pmatch(str, s);
 		*(FNMATCH_IS_ENABLED ? loc2 : loc) = c;
 		if (match)
-			return FNMATCH_IS_ENABLED && quotes ? loc : loc2;
+			return quotes ? loc : loc2;
 
 		if (!c)
 			break;
 
 		mb = mbnext(loc);
 		loc += (mb & 0xff) + (mb >> 8);
-		if (unlikely(FNMATCH_IS_ENABLED || !quotes)) {
-			ml = (mb >> 8) > 3 ? (mb >> 8) - 2 : 1;
-			loc2 += ml;
-		} else
-			loc2 = loc;
+		ml = (mb >> 8) > 3 ? (mb >> 8) - 2 : 1;
+		loc2 += ml;
 	} while (1);
 	return 0;
 }
@@ -645,8 +642,7 @@ static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 	char *loc;
 	char *loc2;
 
-	for (loc = endp, loc2 = rmescend;;
-	     FNMATCH_IS_ENABLED ? loc2-- : (loc2 = loc)) {
+	for (loc = endp, loc2 = rmescend;; loc2--) {
 		char *s = FNMATCH_IS_ENABLED ? loc2 : loc;
 		char c = *s;
 		unsigned ml;
@@ -659,7 +655,7 @@ static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 		match = pmatch(str, s);
 		*(FNMATCH_IS_ENABLED ? loc2 : loc) = c;
 		if (match)
-			return FNMATCH_IS_ENABLED && quotes ? loc : loc2;
+			return quotes ? loc : loc2;
 		if (--loc < startp)
 			break;
 		if (!esc--)
@@ -676,8 +672,7 @@ static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 		loc -= ml + 2;
 		if (*loc == (char)CTLESC)
 			loc--;
-		if (FNMATCH_IS_ENABLED)
-			loc2 -= ml - 1;
+		loc2 -= ml - 1;
 	}
 	return 0;
 }
