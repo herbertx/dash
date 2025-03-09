@@ -1555,7 +1555,7 @@ expandmeta(struct strlist *str)
 
 		if (fflag)
 			goto nometa;
-		if (!strpbrk(str->text, "*?]"))
+		if (!strpbrk(str->text, "*?]") || !memcmp(str->text, "]", 2))
 			goto nometa;
 		savelastp = exparg.lastp;
 
