@@ -650,7 +650,7 @@ static char *scanright(char *startp, char *endp, char *rmesc, char *rmescend,
 
 		if (zero) {
 			*s = '\0';
-			s = rmesc;
+			s = FNMATCH_IS_ENABLED ? rmesc : startp;
 		}
 		match = pmatch(str, s);
 		*(FNMATCH_IS_ENABLED ? loc2 : loc) = c;
