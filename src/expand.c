@@ -1886,7 +1886,9 @@ static __attribute__((noinline)) int ccmatch(char *p, const char *mbc, int ml,
 
 static int pmatch(char *pattern, const char *string)
 {
-	char stop[] = { 0, CTLESC, CTLMBCHAR };
+    /* stop should be null-terminated as it passed as a string to
+     * strpbrk. */
+	char stop[] = { 0, CTLESC, CTLMBCHAR, '\0' };
 	const char *q;
 	unsigned mb;
 	char *p;
