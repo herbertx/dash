@@ -1,0 +1,2 @@
+./tests/no-space/test.sh: 2: echo: echo: I/O error
+(exit: 1)

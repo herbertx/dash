@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+export PATH="$PWD/src:$PATH"
+if [ "$#" -eq 0 ]; then
+  # default arguments: all tests
+  set -- ./tests/*
+fi
+
+success=true
+for test in "$@"; do
+  printf "%-40s " "$test"
+  if "$test/test.sh" >"$test/result.txt" 2>&1; then
+    :
+  else
+    exit="$?"
+    echo "(exit: $exit)" >>"$test/result.txt"
+  fi
+  if git diff --quiet --exit-code "$test/result.txt"; then
+    echo PASS
+  else
+    echo FAIL
+    git diff "$test/result.txt"
+    echo
+    success=false
+  fi
+done
+
+if "$success"; then
+  echo PASS
+else
+  echo FAIL
+  exit 1
+fi
