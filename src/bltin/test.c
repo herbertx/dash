@@ -418,8 +418,10 @@ filstat(char *nm, enum token mode)
 		return (s.st_mode & S_ISUID) != 0;
 	case FILSGID:
 		return (s.st_mode & S_ISGID) != 0;
+#ifdef S_ISVTX
 	case FILSTCK:
 		return (s.st_mode & S_ISVTX) != 0;
+#endif
 	case FILGZ:
 		return !!s.st_size;
 	case FILUID:
