@@ -684,6 +684,7 @@ void __attribute__((noinline)) flush_input(void)
 
 void reset_input(void)
 {
-	flush_input();
 	stdin_istty = -1;
+	basepf.eof = 0;
+	flush_input();
 }
