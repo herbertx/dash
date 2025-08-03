@@ -76,7 +76,7 @@ extern char **argptr;		/* argument list for builtin commands */
 extern char *optionarg;		/* set by nextopt */
 extern char *optptr;		/* used by nextopt */
 
-int procargs(int, char **);
+int procargs(char **);
 void optschanged(void);
 void setparam(char **);
 void freeparam(volatile struct shparam *);

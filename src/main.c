@@ -149,7 +149,7 @@ main(int argc, char **argv)
 	rootpid = getpid();
 	init();
 	setstackmark(&smark);
-	login = procargs(argc, argv);
+	login = procargs(argv);
 	if (login) {
 		state = 1;
 		read_profile("/etc/profile");

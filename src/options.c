@@ -119,26 +119,22 @@ STATIC int getopts(char *, char *, char **);
  */
 
 int
-procargs(int argc, char **argv)
+procargs(char **xargv)
 {
 	int i;
-	const char *xminusc;
-	char **xargv;
 	int login;
 
-	xargv = argv;
 	login = xargv[0] && xargv[0][0] == '-';
 	arg0 = xargv[0];
-	if (argc > 0)
+	if (xargv[0])
 		xargv++;
 	for (i = 0; i < NOPTS; i++)
 		optlist[i] = 2;
 	argptr = xargv;
 	login |= options(1);
 	xargv = argptr;
-	xminusc = minusc;
 	if (*xargv == NULL) {
-		if (xminusc)
+		if (minusc)
 			sh_error("-c requires an argument");
 		sflag = 1;
 	}
@@ -153,7 +149,7 @@ procargs(int argc, char **argv)
 	debug = 1;
 #endif
 	/* POSIX 1003.2: first arg after -c cmd is $0, remainder $1... */
-	if (xminusc) {
+	if (minusc) {
 		minusc = *xargv++;
 		if (*xargv)
 			goto setarg0;
