@@ -40,3 +40,6 @@ Makefile
 .Spotlight*
 .Trash*
 *[Tt]humbs.db
+
+# vim
+.*.sw[a-z]
