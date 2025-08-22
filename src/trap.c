@@ -312,7 +312,7 @@ ignoresig(int signo)
 void
 onsig(int signo)
 {
-	if (vforked)
+	if (vforked && getpid() != vforked)
 		return;
 
 	if (signo == SIGCHLD) {

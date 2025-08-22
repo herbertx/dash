@@ -991,20 +991,17 @@ struct job *vforkexec(union node *n, char **argv, const char *path, int idx)
 
 	jp = makejob(1);
 
-	sigblockall(NULL);
-	vforked++;
+	vforked = getpid();
 
 	pid = vfork();
 
 	if (!pid) {
 		forkchild(jp, n, FORK_FG);
-		sigclearmask();
 		shellexec(argv, path, idx);
 		/* NOTREACHED */
 	}
 
 	vforked = 0;
-	sigclearmask();
 	forkparent(jp, n, FORK_FG, pid);
 
 	return jp;
