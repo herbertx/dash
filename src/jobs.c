@@ -872,6 +872,7 @@ static void forkchild(struct job *jp, union node *n, int mode)
 	lvforked = vforked;
 
 	if (!lvforked) {
+		mypid = 0;
 		shlvl++;
 
 		forkreset(mode == FORK_NOJOB ? n : NULL);
@@ -887,7 +888,7 @@ static void forkchild(struct job *jp, union node *n, int mode)
 		pid_t pgrp;
 
 		if (jp->nprocs == 0)
-			pgrp = getpid();
+			mypid = pgrp = getpid();
 		else
 			pgrp = jp->ps[0].pid;
 		/* This can fail because we are doing it in the parent also */
@@ -991,7 +992,9 @@ struct job *vforkexec(union node *n, char **argv, const char *path, int idx)
 
 	jp = makejob(1);
 
-	vforked = getpid();
+	if (!mypid)
+		mypid = getpid();
+	vforked = mypid;
 
 	pid = vfork();
 

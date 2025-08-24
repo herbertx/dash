@@ -64,6 +64,7 @@
 #define PROFILE 0
 
 int rootpid;
+int mypid;
 int shlvl;
 #ifdef __GLIBC__
 int *dash_errno;
@@ -146,7 +147,7 @@ main(int argc, char **argv)
 	opentrace();
 	trputs("Shell args:  ");  trargs(argv);
 #endif
-	rootpid = getpid();
+	mypid = rootpid = getpid();
 	init();
 	setstackmark(&smark);
 	login = procargs(argv);

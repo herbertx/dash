@@ -38,6 +38,8 @@
 
 /* pid of main shell */
 extern int rootpid;
+/* pid of current shell */
+extern int mypid;
 /* shell level: 0 for the main shell, 1 for its children, and so on */
 extern int shlvl;
 #define rootshell (!shlvl)
