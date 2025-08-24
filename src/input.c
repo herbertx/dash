@@ -77,7 +77,7 @@ MKINIT struct parsefile *toppf = &basepf;
 MKINIT struct stdin_state stdin_state;
 struct parsefile *parsefile = &basepf;	/* current input file */
 int whichprompt;		/* 1 == PS1, 2 == PS2 */
-int stdin_istty;
+int stdin_istty = -1;
 
 MKINIT void input_init(void);
 
@@ -99,8 +99,6 @@ INCLUDE "syntax.h"
 INIT {
 	basepf.nextc = basepf.buf = basebuf;
 	basepf.linno = 1;
-
-	input_init();
 }
 
 RESET {
