@@ -1742,6 +1742,7 @@ expandstr(const char *ps)
 	heredoclist = NULL;
 	saveprompt = doprompt;
 	doprompt = 0;
+	needprompt = 0;
 	result = ps;
 	savehandler = handler;
 	if (unlikely(err = setjmp(jmploc.loc)))
