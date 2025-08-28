@@ -250,6 +250,8 @@ oexpr(enum token n)
 
 	for (;;) {
 		res |= aexpr(n);
+		if (!*t_wp)
+			break;
 		n = t_lex(t_wp + 1);
 		if (n != BOR)
 			break;
@@ -266,6 +268,8 @@ aexpr(enum token n)
 	for (;;) {
 		if (!nexpr(n))
 			res = 0;
+		if (!*t_wp)
+			break;
 		n = t_lex(t_wp + 1);
 		if (n != BAND)
 			break;
