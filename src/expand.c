@@ -513,9 +513,6 @@ static char *expari(char *start, int flag)
 
 	removerecordregions(begoff);
 
-	if (likely(flag & QUOTES_ESC))
-		rmescapes(start);
-
 	pushstackmark(&sm, endoff);
 	result = arith(start);
 	popstackmark(&sm);
