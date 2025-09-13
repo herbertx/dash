@@ -1982,7 +1982,7 @@ static int pmatch(char *pattern, const char *string)
 					mbp >>= 8;
 					p += mbp;
 				}
-				if (*p == '-' && p[1] != ']') {
+				if (*p == '-' && p[1] && p[1] != ']') {
 					p++;
 					if (*p == (char)CTLESC)
 						p++;
