@@ -1617,7 +1617,7 @@ parsebackq: {
 	} else {
 		if (chkeofmark) {
 			out = commandtextcont(n, out);
-			USTPUTC(')', out);
+			STPUTC(')', out);
 		}
 		goto parsebackq_newreturn;
 	}
