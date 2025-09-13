@@ -1510,7 +1510,6 @@ parsebackq: {
 	int uninitialized_var(saveprompt);
 	struct heredoc *saveheredoclist;
 	struct nodelist **nlpp;
-	size_t psavelen;
 	size_t savelen;
 	union node *n;
 	unsigned ml;
@@ -1521,24 +1520,28 @@ parsebackq: {
 		STADJUST(oldstyle - 1, out);
 		out[-1] = CTLBACKQ;
 	}
-	str = stackblock();
-	savelen = out - (char *)stackblock();
-	grabstackblock(savelen);
+	if (!chkeofmark || !oldstyle) {
+		str = stackblock();
+		savelen = out - (char *)stackblock();
+		grabstackblock(savelen);
+		STARTSTACKSTR(out);
+	}
         if (oldstyle) {
                 /* We must read until the closing backquote, giving special
                    treatment to some slashes, and then push the string and
                    reread it as input, interpreting it normally.  */
-                char *pout;
+		bool done = false;
+		char *pout = out;
                 int pc;
 
-                STARTSTACKSTR(pout);
-		for (;;) {
+		while (!done) {
 			if (needprompt) {
 				setprompt(2);
 			}
 			switch (pc = pgetc_eatbnl()) {
 			case '`':
-				goto done;
+				done = true;
+				break;
 
 			case '\\':
                                 pc = pgetc();
@@ -1564,9 +1567,11 @@ parsebackq: {
 			}
 			STPUTC(pc, pout);
                 }
-done:
-                STPUTC('\0', pout);
-                psavelen = pout - (char *)stackblock();
+		if (chkeofmark) {
+			out = pout;
+			goto parsebackq_oldreturn;
+		}
+		pout[-1] = 0;
 		pstr = grabstackstr(pout);
 		setinputstring(pstr);
         }
@@ -1608,10 +1613,6 @@ done:
 		 * parsing.
 		 */
 		tokpushback = 0;
-		if (chkeofmark) {
-			pstr[psavelen - 1] = '`';
-			out = stnputs(pstr, psavelen, out);
-		}
 		goto parsebackq_oldreturn;
 	} else {
 		if (chkeofmark) {
