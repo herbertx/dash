@@ -129,9 +129,6 @@ intmax_t atomax(const char *s, int base)
 	errno = 0;
 	r = strtoimax(s, &p, base);
 
-	if (errno == ERANGE)
-		badnum(s);
-
 	/*
 	 * Disallow completely blank strings in non-arithmetic (base != 0)
 	 * contexts.
