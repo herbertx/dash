@@ -138,7 +138,7 @@ procargs(char **xargv)
 			sh_error("-c requires an argument");
 		sflag = 1;
 	}
-	if (iflag == 2 && sflag == 1 && stdin_istty && isatty(1))
+	if (iflag == 2 && sflag == 1 && stdin_istty && isatty(2))
 		iflag = 1;
 	if (mflag == 2)
 		mflag = iflag;
