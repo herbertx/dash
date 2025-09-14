@@ -354,8 +354,7 @@ start:
 			continue;
 		case CTLQUOTEMARK:
 			/* "$@" syntax adherence hack */
-			if (!inquotes && !memcmp(p, dolatstr + 1,
-						 DOLATSTRLEN - 1)) {
+			if (!inquotes && !strcmp(p, dolatstr + 1)) {
 				p = evalvar(p + 1, flag | EXP_QUOTED) + 1;
 				goto start;
 			}
@@ -1552,7 +1551,7 @@ expandmeta(struct strlist *str)
 
 		if (fflag)
 			goto nometa;
-		if (!strpbrk(str->text, "*?]") || !memcmp(str->text, "]", 2))
+		if (!strpbrk(str->text, "*?]") || !strcmp(str->text, "]"))
 			goto nometa;
 		savelastp = exparg.lastp;
 
@@ -1996,7 +1995,7 @@ static int pmatch(char *pattern, const char *string)
 					    chr >= c && chr <= *p)
 						found = 1;
 					p++;
-				} else if (!memcmp(mbs, q, mb))
+				} else if (!strncmp(mbs, q, mb))
 					found = 1;
 			} while ((c = *p++) != ']');
 			if (found == invert)
@@ -2011,7 +2010,7 @@ static int pmatch(char *pattern, const char *string)
 			q += mb & 0xff;
 			mb >>= 8;
 
-			if (memcmp(p - 1, q - 1, mb + 1))
+			if (strncmp(p - 1, q - 1, mb + 1))
 				return 0;
 
 			p += mb;
