@@ -1911,7 +1911,7 @@ static int pmatch(char *pattern, const char *string)
 				c = *++p;
 			if (!c)
 				return 1;
-			if (c == '?' || c != '[')
+			if (c == '?' || c == '[')
 				c = CTLESC;
 			for (;;) {
 				if (c != CTLESC) {
