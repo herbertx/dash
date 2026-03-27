@@ -1,0 +1,2 @@
+#!./src/dash
+echo "/"root*

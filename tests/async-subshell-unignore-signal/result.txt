@@ -1,0 +1,4 @@
+Scenario 0: "set -i" makes a subshell un-ignore SIGINT.
+Scenario 1: resetting SIGINT handler.
+Scenario 2: ignoring SIGINT.
+OK
