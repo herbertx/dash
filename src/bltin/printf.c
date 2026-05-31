@@ -429,7 +429,7 @@ hex:
 			USTPUTC(CTLMBCHAR, out);
 			USTPUTC(len, out);
 			STADJUST(mboff, out);
-			*(uint32_t *)out = value;
+			memcpy(out, &value, 4);
 			STADJUST(len, out);
 			USTPUTC(len, out);
 			USTPUTC(CTLMBCHAR, out);
