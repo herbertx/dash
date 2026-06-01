@@ -293,12 +293,12 @@ Enclosing characters within double quotes preserves the literal
 meaning of all characters except dollarsign
 .Pq $ ,
 backquote
-.Pq ` ,
+.Pq \(ga ,
 and backslash
 .Pq \e .
 The backslash inside double quotes is historically weird, and serves to
 quote only the following characters:
-.Dl $  `  \*q  \e  <newline> .
+.Dl $  \(ga  \*q  \e  <newline> .
 Otherwise it remains literal.
 .Ss Reserved Words
 Reserved words are words that have special meaning to the
@@ -983,7 +983,7 @@ or
 version
 .Pc :
 .Pp
-.Dl `command`
+.Dl \(gacommand\(ga
 .Pp
 The shell expands the command substitution by executing command in a
 subshell environment and replacing the command substitution with the
