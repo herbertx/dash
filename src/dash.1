@@ -197,7 +197,7 @@ operand and the positional parameters ($1, $2, etc.)
 set from the remaining argument operands.
 .It Fl C Em noclobber
 Don't overwrite existing files with
-.Dq \*[Gt] .
+.Dq > .
 .It Fl e Em errexit
 If not interactive, exit immediately if any untested command fails.
 The exit status of a command is considered to be
@@ -268,9 +268,9 @@ operators (their meaning is discussed later).
 Following is a list of operators:
 .Bl -ohang -offset indent
 .It "Control operators:"
-.Dl &  &&  \&(  \&)  \&;  ;; | || \*[Lt]newline\*[Gt]
+.Dl &  &&  \&(  \&)  \&;  ;; | || <newline>
 .It "Redirection operators:"
-.Dl \*[Lt]  \*[Gt]  \*[Gt]|  \*[Lt]\*[Lt]  \*[Gt]\*[Gt]  \*[Lt]&  \*[Gt]&  \*[Lt]\*[Lt]-  \*[Lt]\*[Gt]
+.Dl <  >  >|  <<  >>  <&  >&  <<-  <>
 .El
 .Ss Quoting
 Quoting is used to remove the special meaning of certain characters or
@@ -298,7 +298,7 @@ and backslash
 .Pq \e .
 The backslash inside double quotes is historically weird, and serves to
 quote only the following characters:
-.Dl $  `  \*q  \e  \*[Lt]newline\*[Gt] .
+.Dl $  `  \*q  \e  <newline> .
 Otherwise it remains literal.
 .Ss Reserved Words
 Reserved words are words that have special meaning to the
@@ -391,25 +391,25 @@ is an optional number between 0 and 9, as in
 .Sq Bq 3 ) ,
 that refers to a file descriptor.
 .Bl -tag -width aaabsfiles -offset indent
-.It [n] Ns \*[Gt] file
+.It [n] Ns > file
 Redirect standard output (or n) to file.
-.It [n] Ns \*[Gt]| file
+.It [n] Ns >| file
 Same, but override the
 .Fl C
 option.
-.It [n] Ns \*[Gt]\*[Gt] file
+.It [n] Ns >> file
 Append standard output (or n) to file.
-.It [n] Ns \*[Lt] file
+.It [n] Ns < file
 Redirect standard input (or n) from file.
-.It [n1] Ns \*[Lt]& Ns n2
+.It [n1] Ns <& Ns n2
 Copy file descriptor n2 as stdin (or fd n1).
-.It [n] Ns \*[Lt]&-
+.It [n] Ns <&-
 Close standard input (or n).
-.It [n1] Ns \*[Gt]& Ns n2
+.It [n1] Ns >& Ns n2
 Copy file descriptor n2 as stdout (or fd n1).
-.It [n] Ns \*[Gt]&-
+.It [n] Ns >&-
 Close standard output (or n).
-.It [n] Ns \*[Lt]\*[Gt] file
+.It [n] Ns <> file
 Open file for reading and writing on standard input (or n).
 .El
 .Pp
@@ -417,7 +417,7 @@ The following redirection is often called a
 .Dq here-document .
 .Bl -item -offset indent
 .It
-.Li [n]\*[Lt]\*[Lt] delimiter
+.Li [n]<< delimiter
 .Dl here-doc-text ...
 .Li delimiter
 .El
@@ -431,9 +431,9 @@ subjected to parameter expansion, command substitution, and arithmetic
 expansion (as described in the section on
 .Dq Expansions ) .
 If the operator is
-.Dq \*[Lt]\*[Lt]-
+.Dq <<-
 instead of
-.Dq \*[Lt]\*[Lt] ,
+.Dq << ,
 then leading tabs in the here-doc-text are stripped.
 .Ss Search and Execution
 There are three types of commands: shell functions, builtin commands, and
@@ -567,7 +567,7 @@ Because pipeline assignment of standard input or standard output or both
 takes place before redirection, it can be modified by redirection.
 For example:
 .Pp
-.Dl $ command1 2\*[Gt]&1 | command2
+.Dl $ command1 2>&1 | command2
 .Pp
 sends both the standard output and standard error of command1
 to the standard input of command2.
@@ -698,7 +698,7 @@ Grouping commands together this way allows you to redirect
 their output as though they were one program:
 .\".Pp
 .Bd -literal -offset indent
-{ printf \*q hello \*q ; printf \*q world\\n" ; } \*[Gt] greeting
+{ printf \*q hello \*q ; printf \*q world\\n" ; } > greeting
 .Ed
 .Pp
 Note that
@@ -764,7 +764,7 @@ numeric.
 A parameter can also be denoted by a number or a special
 character as explained below.
 .Ss Positional Parameters
-A positional parameter is a parameter denoted by a number (n \*[Gt] 0).
+A positional parameter is a parameter denoted by a number (n > 0).
 The shell sets these initially to the values of its command line arguments
 that follow the name of the shell script.
 The
@@ -1627,19 +1627,19 @@ Character escape sequences are in backslash notation as defined in
 The characters and their meanings are as follows:
 .Bl -tag -width Ds -offset indent
 .It Cm \ea
-Write a \*[Lt]bell\*[Gt] character.
+Write a <bell> character.
 .It Cm \eb
-Write a \*[Lt]backspace\*[Gt] character.
+Write a <backspace> character.
 .It Cm \ef
-Write a \*[Lt]form-feed\*[Gt] character.
+Write a <form-feed> character.
 .It Cm \en
-Write a \*[Lt]new-line\*[Gt] character.
+Write a <new-line> character.
 .It Cm \er
-Write a \*[Lt]carriage return\*[Gt] character.
+Write a <carriage return> character.
 .It Cm \et
-Write a \*[Lt]tab\*[Gt] character.
+Write a <tab> character.
 .It Cm \ev
-Write a \*[Lt]vertical tab\*[Gt] character.
+Write a <vertical tab> character.
 .It Cm \e\e
 Write a backslash character.
 .It Cm \e Ns Ar num
@@ -2062,13 +2062,13 @@ True if the strings
 and
 .Ar \&s\&2
 are not identical.
-.It Ar \&s\&1 Cm \&\*[Lt] Ar \&s\&2
+.It Ar \&s\&1 Cm \&< Ar \&s\&2
 True if string
 .Ar \&s\&1
 comes before
 .Ar \&s\&2
 based on the ASCII value of their characters.
-.It Ar \&s\&1 Cm \&\*[Gt] Ar \&s\&2
+.It Ar \&s\&1 Cm \&> Ar \&s\&2
 True if string
 .Ar \&s\&1
 comes after
@@ -2380,7 +2380,7 @@ unless you are the superuser, in which case it defaults to
 .Dq #\  .
 .It Ev PS2
 The secondary prompt string, which defaults to
-.Dq \*[Gt]\  .
+.Dq >\  .
 .It Ev PS4
 Output before each line when execution trace (set -x) is enabled,
 defaults to
