@@ -968,7 +968,7 @@ static char *dollarsq_escape(char *out)
 
 		p += !((c ^ *p) | (c ^ '\\'));
 
-		conv_ch = (c & ~((c & 0x40) >> 1)) ^ 0x40;
+		conv_ch = (c & ~((c & 0x40) >> 1) & 0x7f) ^ 0x40;
 		USTPUTC(conv_ch, out);
 	}
 
