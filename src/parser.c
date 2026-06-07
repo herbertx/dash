@@ -1553,6 +1553,7 @@ parsebackq: {
                 int pc;
 
 		while (!done) {
+			CHECKSTRSPACE(MB_LEN_MAX + 1, pout);
 			if (needprompt) {
 				setprompt(2);
 			}
@@ -1565,8 +1566,7 @@ parsebackq: {
                                 pc = pgetc();
                                 if (pc != '\\' && pc != '`' && pc != '$'
                                     && (!synstack->dblquote || pc != '"'))
-                                        STPUTC('\\', pout);
-				CHECKSTRSPACE(MB_LEN_MAX, pout);
+                                        USTPUTC('\\', pout);
 				ml = getmbc(pc, pout, 2);
 				pout += ml;
 				if (ml)
@@ -1583,7 +1583,7 @@ parsebackq: {
 			default:
 				break;
 			}
-			STPUTC(pc, pout);
+			USTPUTC(pc, pout);
                 }
 		pout[-1] = 0;
 		pstr = grabstackstr(pout);
