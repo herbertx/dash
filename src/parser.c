@@ -92,6 +92,7 @@ struct synstack {
 	int innerdq;
 	int varpushed;
 	int dblquote;
+	int backq;		/* Inside back quotes (here-doc word only). */
 	int varnest;		/* levels of variables expansion */
 	int parenlevel;		/* levels of parens in arithmetic */
 	int dqvarnest;		/* levels of variables expansion within double quotes */
@@ -1004,7 +1005,7 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 	};
 	int chkeofmark = checkkwd & CHKEOFMARK;
 	struct synstack *synstack = &synbase;
-	bool sqheredoc = syntax == SQSYNTAX;
+	bool printesc = syntax == SQSYNTAX;
 	struct nodelist *bqlist = NULL;
 	int dollarsq = 0;
 	int c = firstc;
@@ -1035,9 +1036,10 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 			CHECKSTRSPACE((MB_LEN_MAX > 16 ? MB_LEN_MAX : 16) + 7,
 				      out);
 			fieldsplitting = synstack->syntax == BASESYNTAX &&
-					 !synstack->varnest ? 4 : 0;
+					 !(synstack->varnest |
+					   synstack->backq) ? 4 : 0;
 			ml = getmbc(c, out, fieldsplitting |
-					    (sqheredoc ? 2 : 0));
+					    (printesc ? 2 : 0));
 			if (ml == 1) {
 				if (out == stackblock())
 					return TBLANK;
@@ -1079,7 +1081,8 @@ readtoken1(int firstc, char const *syntax, char *eofmark, int striptabs)
 				}
 
 				if (
-					synstack->dblquote &&
+					(synstack->dblquote |
+					 synstack->backq) &&
 					c != '\\' && c != '`' &&
 					c != '$' && (
 						c != '"' ||
@@ -1182,13 +1185,19 @@ toggledq:
 				USTPUTC(c, out);
 				break;
 			case CBQUOTE:	/* '`' */
+				if (synstack->backq == 2)
+					goto end_backq;
 				USTPUTC('`', out);
 				PARSEBACKQOLD();
 				break;
 			case CEOF:
 				goto endword;		/* exit outer loop */
 			default:
-				if (fieldsplitting)
+				if (c == ')' && synstack->backq == 1) {
+end_backq:
+					synstack_pop(&synstack);
+					printesc = 0;
+				} else if (fieldsplitting)
 					goto endword;	/* exit outer loop */
 				USTPUTC(c, out);
 			}
@@ -1197,7 +1206,8 @@ toggledq:
 endword:
 	if (synstack->syntax == ARISYNTAX)
 		synerror("Missing '))'");
-	if (synstack->syntax != BASESYNTAX && eofmark == NULL)
+	if ((synstack->syntax != BASESYNTAX && eofmark == NULL) ||
+	    synstack->backq)
 		synerror("Unterminated quoted string");
 	if (synstack->varnest != 0) {
 		/* { */
@@ -1520,16 +1530,20 @@ parsebackq: {
 	char *pstr;
 	char *str;
 
-	if (!chkeofmark) {
-		STADJUST(oldstyle - 1, out);
-		out[-1] = CTLBACKQ;
+	if (chkeofmark) {
+		synstack_push(&synstack,
+			      synstack->prev ?: alloca(sizeof(*synstack)),
+			      BASESYNTAX);
+		synstack->backq = oldstyle + 1;
+		printesc = 1;
+		goto parsebackq_out;
 	}
-	if (!chkeofmark || !oldstyle) {
-		str = stackblock();
-		savelen = out - (char *)stackblock();
-		grabstackblock(savelen);
-		STARTSTACKSTR(out);
-	}
+	STADJUST(oldstyle - 1, out);
+	out[-1] = CTLBACKQ;
+	str = stackblock();
+	savelen = out - (char *)stackblock();
+	grabstackblock(savelen);
+	STARTSTACKSTR(out);
         if (oldstyle) {
                 /* We must read until the closing backquote, giving special
                    treatment to some slashes, and then push the string and
@@ -1571,10 +1585,6 @@ parsebackq: {
 			}
 			STPUTC(pc, pout);
                 }
-		if (chkeofmark) {
-			out = pout;
-			goto parsebackq_oldreturn;
-		}
 		pout[-1] = 0;
 		pstr = grabstackstr(pout);
 		setinputstring(pstr);
@@ -1612,6 +1622,7 @@ parsebackq: {
 
 	out = stnputs(str, savelen, stackblock());
 
+parsebackq_out:
 	if (oldstyle) {
 		/* Ignore any pushed back tokens left from the backquote
 		 * parsing.
@@ -1619,10 +1630,6 @@ parsebackq: {
 		tokpushback = 0;
 		goto parsebackq_oldreturn;
 	} else {
-		if (chkeofmark) {
-			out = commandtextcont(n, out);
-			STPUTC(')', out);
-		}
 		goto parsebackq_newreturn;
 	}
 }
