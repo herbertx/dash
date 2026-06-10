@@ -1712,8 +1712,7 @@ synerror(const char *msg)
 	/* NOTREACHED */
 }
 
-STATIC void
-setprompt(int which)
+static void __attribute__((noinline)) setprompt(int which)
 {
 	struct stackmark smark;
 	int show;
@@ -1726,7 +1725,7 @@ setprompt(int which)
 #else
 	show = !el;
 #endif
-	if (show) {
+	if (show && !parsefile->nleft) {
 		pushstackmark(&smark, stackblocksize());
 		out2str(getprompt(NULL));
 		popstackmark(&smark);
