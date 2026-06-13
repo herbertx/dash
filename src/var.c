@@ -156,7 +156,8 @@ RESET {
 
 static char *varnull(const char *s)
 {
-	return (strchr(s, '=') ?: nullstr - 1) + 1;
+	/* Unset variables always end with two NUL chars. */
+	return strchrnul(s, '=') + 1;
 }
 
 /*
