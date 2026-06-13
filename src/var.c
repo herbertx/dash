@@ -210,9 +210,9 @@ struct var *setvar(const char *name, const char *val, int flags)
 		vallen = strlen(val);
 	}
 	INTOFF;
-	p = mempcpy(nameeq = ckmalloc(namelen + vallen + 2), name, namelen);
+	p = mempcpy(nameeq = ckmalloc(namelen + vallen + 2), name, namelen + 1);
 	if (val) {
-		*p++ = '=';
+		p[-1] = '=';
 		p = mempcpy(p, val, vallen);
 	}
 	*p = '\0';
