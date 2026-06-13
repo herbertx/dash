@@ -32,6 +32,7 @@
  * SUCH DAMAGE.
  */
 
+#include <locale.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,6 +82,12 @@ MKINIT char defoptindvar[] = "OPTIND=1";
 int lineno;
 char linenovar[sizeof("LINENO=")+sizeof(int)*CHAR_BIT/3+1] = "LINENO=";
 
+static void changelocale(const char *val)
+{
+	putenv((char *)val);
+	setlocale(LC_ALL, nullstr);
+}
+
 /* Some macros in var.h depend on the order, add new variables to the end. */
 struct var varinit[] = {
 #if ATTY
@@ -101,6 +108,11 @@ struct var varinit[] = {
 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"TERM\0",	0 },
 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"HISTSIZE\0",	sethistsize },
 #endif
+	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_ALL\0",	changelocale },
+	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_COLLATE\0", changelocale },
+	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_CTYPE\0", changelocale },
+	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_NUMERIC\0", changelocale },
+	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LANG\0",	changelocale },
 };
 
 STATIC struct var *vartab[VTABSIZE];
@@ -158,6 +170,19 @@ static char *varnull(const char *s)
 {
 	/* Unset variables always end with two NUL chars. */
 	return strchrnul(s, '=') + 1;
+}
+
+static void varfunc(struct var *vp)
+{
+	const char *s;
+
+	if (!vp->func)
+		return;
+
+	s = vp->text;
+	if (!(vp->flags & VFULL))
+		s = varnull(s);
+	(*vp->func)(s);
 }
 
 /*
@@ -299,8 +324,8 @@ out_free:
 	vp->text = s;
 	vp->flags = flags;
 
-	if (vp->func && (flags & VNOFUNC) == 0)
-		(*vp->func)(varnull(s));
+	if (!(flags & VNOFUNC))
+		varfunc(vp);
 
 out:
 	return vp;
@@ -536,8 +561,8 @@ poplocalvars(void)
 				ckfree(vp->text);
 			vp->flags = lvp->flags;
 			vp->text = lvp->text;
-			if (vp->func && !(vp->flags & VNOFUNC))
-				(*vp->func)(varnull(vp->text));
+			if (!(vp->flags & VNOFUNC))
+				varfunc(vp);
 		}
 		ckfree(lvp);
 	}
