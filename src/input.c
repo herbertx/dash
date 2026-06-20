@@ -217,26 +217,6 @@ static void freestrings(struct strpush *sp)
 }
 
 
-static int __pgetc(void)
-{
-	int c;
-
-	if (parsefile->unget) {
-		long unget = -(long)(unsigned)parsefile->unget--;
-
-		return parsefile->nextc[unget];
-	}
-
-	if (parsefile->nleft > 0) {
-		parsefile->nleft--;
-		c = (signed char)*parsefile->nextc++;
-	} else
-		c = preadbuffer();
-
-	return c;
-}
-
-
 /*
  * Read a character from the script, returning PEOF on end of file.
  * Nul characters in the input are silently discarded.
@@ -245,11 +225,39 @@ static int __pgetc(void)
 int __attribute__((noinline)) pgetc(void)
 {
 	struct strpush *sp = parsefile->spfree;
+	int c;
 
 	if (unlikely(sp))
 		freestrings(sp);
 
-	return __pgetc();
+again:
+	if (parsefile->unget) {
+		long unget = -(long)(unsigned)parsefile->unget--;
+
+		return (signed char)parsefile->nextc[unget];
+	}
+
+nextc:
+	if (likely(parsefile->nleft > 0)) {
+		parsefile->nleft--;
+		c = (signed char)*parsefile->nextc++;
+	} else if (unlikely(parsefile->strpush)) {
+		popstring();
+		/* The freestrings call must be delayed til the next
+		 * pgetc call for PEOA to work properly.
+		 */
+		goto again;
+	} else
+		c = preadbuffer();
+
+	/* delete nul characters */
+	if (IS_DEFINED_SMALL && unlikely(!c)) {
+		parsefile->nextc = memmove(parsefile->nextc - 1,
+					   parsefile->nextc, parsefile->nleft);
+		goto nextc;
+	}
+
+	return c;
 }
 
 int pgetc_eoa(void)
@@ -374,10 +382,6 @@ static int preadbuffer(void)
 	int more;
 	char *q;
 
-	if (unlikely(parsefile->strpush)) {
-		popstring();
-		return __pgetc();
-	}
 	if (parsefile->eof & 2) {
 eof:
 		parsefile->eof = 3;
@@ -408,6 +412,12 @@ again:
 		}
 	}
 
+	if (IS_DEFINED_SMALL) {
+		q += more;
+		more = 0;
+		goto done;
+	}
+
 	/* delete nul characters */
 	for (;;) {
 		int c;
@@ -421,9 +431,6 @@ again:
 		}
 
 		q++;
-
-		if (IS_DEFINED_SMALL)
-			goto check;
 
 		switch (c) {
 		case '\n':
@@ -439,11 +446,8 @@ again:
 		}
 
 check:
-		if (more <= 0) {
-			if (!IS_DEFINED_SMALL)
-				goto again;
-			break;
-		}
+		if (more <= 0)
+			goto again;
 	}
 done:
 	input_set_lleft(parsefile, more);
