@@ -56,6 +56,7 @@ static char  **gargv;
 
 #include "bltin.h"
 #include "parser.h"
+#include "syntax.h"
 #include "system.h"
 
 #define PF(f, func) { \
@@ -350,7 +351,7 @@ unsigned conv_escape(char *str0, char *out0, bool mbchar)
 
 		value = '\\';
 
-		if (isodigit(ch)) {
+		if (unlikely(isodigit(ch))) {
 			ch = 3;
 			value = 0;
 			do {
@@ -362,8 +363,12 @@ unsigned conv_escape(char *str0, char *out0, bool mbchar)
 		str--;
 
 check_value:
-		if (mbchar && (signed char)value >= CTL_FIRST &&
-		    (signed char)value <= CTL_LAST)
+		if (SQSYNTAX[(signed char)value] != CCTL)
+			break;
+		/* fall through */
+
+	case '\\':
+		if (mbchar)
 			USTPUTC(CTLESC, out);
 		break;
 
@@ -395,10 +400,10 @@ hex:
 			value += d;
 		} while (--ch);
 
-		if (value < 0x80)
-			break;
-
 		if (och <= 2)
+			goto check_value;
+
+		if (value < 0x80)
 			goto check_value;
 
 		if (value < 0x110000) {
@@ -441,9 +446,6 @@ hex:
 	case 'u':
 		ch = 4;
 		goto hex;
-
-	case '\\':
-		break;
 
 	case 'a':				/* alert */
 	case 'b':				/* backspace */
